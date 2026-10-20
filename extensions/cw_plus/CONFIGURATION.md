@@ -44,8 +44,9 @@
 | `formation` | 阶段阵容、职责、候选席位、羁绊与升级条件；省略或 `null` 沿用基础布阵，没有 `enabled` 字段 |
 | `economy` | 新阶段经济；省略、`null` 或 `enabled: false` 沿用旧经济 |
 | `opening_policy` | 分别限制开局出售和刷新何时开放 |
-| `equipment` | 已上场角色的推荐装备检查顺序和周期；省略不等于禁用装备 |
+| `equipment` | 已上场角色的推荐装备检查顺序和节点；省略不等于禁用装备 |
 | `reward_fast_rounds` | 指定奖励快速关卡；省略、`null` 或空列表使用普通流程 |
+| `recommend_invest_strategies` | 推荐投资策略；分号分隔字符串或字符串数组，越靠前越优先 |
 | `special_events` | 已支持事件的选项关键词和优先级组 |
 | `preparation_budget`、`shopping_budget` | 准备与购物的分项动作、次数和时间配置 |
 
@@ -93,7 +94,9 @@
 
 `reward_fast_rounds` 为不重复的关卡数组，只影响列出的关卡。启用条件满足时，只购买自然商店当前页需求牌，不刷新、不买经验，跳过该轮常规水晶、全队扫描、布阵、出售与装备。不要将需要换阵或补装备的普通关卡随意加入；3-7 始终使用强制终局流程。
 
-`equipment` 需要非空 `priority_characters` 和 `others_from_round`，`interval_battles` 默认 2。只处理已上场合格角色，指定关卡前只检查优先名单，之后开放其他角色；首次开放其他角色也可触发检查，因此不是严格固定在第 2、4、6 战检查。推荐装备不能指定逐件配方。仅需间隔时可使用顶层 `equipment_interval_battles`，两处同时填写时必须一致。
+`equipment` 需要非空 `priority_characters` 和 `others_from_round`。装备只在每个位面的第 4 个节点和最后一个节点处理（1-4、1-9、2-4、2-7、3-4、3-7），其他节点不打开装备面板；备战关卡未确认时按 `interval_battles`（默认 2 场战斗）兜底。只处理已上场合格角色，指定关卡前只检查优先名单，之后开放其他角色。推荐装备不能指定逐件配方。顶层 `equipment_interval_battles` 与 `equipment.interval_battles` 同时填写时必须一致。
+
+`recommend_invest_strategies` 支持分号分隔字符串（`;`/`；`）或字符串数组，按顺序优先；扩展窗口的「投资策略优先」会排在攻略推荐之前。投资三选一时只在这三张卡里匹配，未命中或卡片文字无法识别时沿用原有选择（优先未收集/中间卡，并避开全员晋升、大裁员等会替换阵容的策略）。
 
 ## 事件关键词
 

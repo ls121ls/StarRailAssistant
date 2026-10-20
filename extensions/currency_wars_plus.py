@@ -28,6 +28,8 @@ class CurrencyWarsPlusConfig(BaseModel):
     difficulty: int = Field(default=0, ge=0, le=2, alias="难度", description="选择最低难度、最高难度或保持当前难度。",
         json_schema_extra={"enum": [0, 1, 2], "x-enum-labels": ["最低难度", "最高难度", "当前难度"]})
     overclock: bool = Field(default=False, alias="超频博弈", description="开启后运行超频博弈，关闭后运行常规博弈。")
+    investment_priority: str = Field(default="", alias="投资策略优先",
+        description="可选；用分号分隔投资策略名称，越靠前越优先。留空时使用攻略里的 recommend_invest_strategies。")
 
     # Yukki：选项扫描只重建显示列表，保存值继续使用攻略文件名。
     @classmethod
@@ -72,6 +74,7 @@ class CurrencyWarsPlusExtension(BaseExtension[CurrencyWarsPlusConfig]):
                     task._check_stop()
                     if initialize_strategy:
                         task.load_strategy(str(strategy))
+                        task.set_investment_priority(self.config.investment_priority)
                         task.set_difficulty(self.config.difficulty)
                         task.set_overclock(self.config.overclock)
                     return task

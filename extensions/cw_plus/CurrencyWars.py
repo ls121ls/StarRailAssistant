@@ -62,9 +62,9 @@ from .economy import (
 )
 from .policy import (
     parse_preparation_round, parse_experience_progress, parse_experience_cap,
-    parse_opening_policy_config,
+    parse_opening_policy_config, parse_investment_priority,
 )
-from .equipment_policy import parse_equipment_config, allowed_order
+from .equipment_policy import parse_equipment_config, allowed_order, is_equipment_round
 from .shopping_batch import ShoppingBatch
 from .shop_stall_recovery import (purchase_noop_evidence, prepare_stalled_shop_rebuild,
     reliable_balance, shop_signature, capture_purchase_noop_state, resolve_page_purchase_noop)
@@ -131,6 +131,10 @@ class CurrencyWars(Executable):
     STRATEGY_APPLIED_IMAGE = str(RESOURCE_ROOT / "cancel_apply.png")
     SHOP_REFRESH_COST = 2  # 真实日志中的连续余额 51 → 49 → 47 已确认此费用。
     FINAL_ROUND_REFRESH_LIMIT = 80  # 包含免费刷新和同回合恢复。
+    # 会替换或清空已上阵角色的投资策略：选中后前后台阵容不能沿用缓存。
+    FIELD_REPLACING_INVESTMENTS = ("全员晋升", "大裁员", "降本增效", "现金为王", "人力重组")
+    INVEST_CARD_CENTERS = ((0.27, 0.30), (0.50, 0.30), (0.73, 0.30))
+    INVEST_CARDS_ROI = (0.05, 0.10, 0.95, 0.62)
 
     SHOP_EXPERIENCE_COST = 4  # 这是本玩法单次 F 输入的价格，并非整级升级价格。
 
@@ -196,6 +200,8 @@ class CurrencyWars(Executable):
         self.strategy_characters: dict[str, int] = dict()  # 在攻略中的角色及其预期星级
         self.strategy_code = ""  # 当前使用的攻略代码
         self.strategy_special_events: dict[str, str] = dict()  # 攻略中的特殊事件处理
+        self.recommend_invest_strategies: tuple[str, ...] = ()  # 攻略推荐的投资策略（按优先级）
+        self._config_investment_priorities: tuple[str, ...] = ()  # 扩展窗口手动填写的优先项
         self.is_overclock = False  # 超频博弈
         self.is_complex_invest_strategy_selection_enabled = False  # 是否启用复杂投资策略选择逻辑
         self._default_off_field_area = list(self.off_field_area)
@@ -250,7 +256,6 @@ class CurrencyWars(Executable):
         self._last_completed_battle_id = None
         self.equipment_interval_battles = None
         self.equipment_config = None
-        self._equipment_others_checked = False
         self._equipment_battles_since_check = 0
         self._equipment_batch_running = False
         self._equipment_batch_attempts = 0
@@ -297,6 +302,9 @@ class CurrencyWars(Executable):
         self._preparation_moves = 0
         self._preparation_recoveries = 0
         self._field_observed_at = None
+        # 已确认阵容在战斗与不改变名单的奖励后可跨准备期沿用；
+        # 只由显式失效（移动、同名合成、投资、异常）或缺失证据清除。
+        self._field_cache_valid = False
         # 只接纳真实完整观测；缓存复用和逻辑赋值不能延长有效期。
         self._slot_evidence = {}
         self._backend_layout_observed_at = None
@@ -512,6 +520,13 @@ class CurrencyWars(Executable):
         """完整几何不代表已确定所有支援身份或普通人口名额。"""
         return (self._layout_valid and self._backend_identity_confirmed
                 and not self._backend_unknown_slots)
+
+    def _field_cache_ready(self):
+        """前后台身份、星级与布局均已确认时，阵容可跨准备期沿用。"""
+        return (self._layout_valid and self._backend_identity_ready()
+                and all(self._complete_slot_observation(obs)
+                        for area in ("on_field", "off_field")
+                        for obs in self._observations[area]))
 
     def _formation_stage(self):
         return self._effective_formation().stage
@@ -1193,17 +1208,42 @@ class CurrencyWars(Executable):
         observation = self._observations[area][index]
         key = (area, index)
         receipt = self._slot_evidence.get(key)
-        return (key in self._dirty_slots or not self._complete_slot_observation(observation)
-                or receipt is None or receipt[0] is not observation
-                or (time.monotonic() if now is None else now) - receipt[1]
-                    >= self.preparation_budget["field_refresh_seconds"])
+        if (key in self._dirty_slots or not self._complete_slot_observation(observation)
+                or receipt is None or receipt[0] is not observation):
+            return True
+        if area != "in_hand" and self._field_cache_valid:
+            # 已确认阵容跨准备期沿用；新角色、替换与合成只经显式失效和脏槽触发重读。
+            return False
+        return (time.monotonic() if now is None else now) - receipt[1] \
+            >= self.preparation_budget["field_refresh_seconds"]
 
-    def _invalidate_roster_evidence(self, reason):
-        """未知来源可同时改动任意身份/星级；保留历史，但恢复完整读取。"""
+    def _invalidate_roster_evidence(self, reason, *, preserve_field=False):
+        """未知来源可同时改动任意身份/星级；保留历史，但恢复完整读取。
+        preserve_field 仅用于已确认不替换已上阵角色的奖励：备战席照常失效，
+        前后台阵容及布局证据沿用，避免每回合重复整场 OCR。
+        """
         if not reason.startswith("purchase_recheck"):
             self._mark_reward_transaction_context_change(reason)
+        if preserve_field and self._field_cache_ready():
+            self._slot_evidence = {key: value for key, value in self._slot_evidence.items()
+                                   if key[0] != "in_hand"}
+            self._bench_observed_at = None
+            self._bench_dirty = True
+            self._purchase_scan_baseline = None
+            self._effective_targets_key = None
+            self._preparation_assessment_cache = None
+            self._formation_plan = ()
+            self._formation_plan_stage = None
+            for index in range(len(self._observations["in_hand"])):
+                self._set_observation("in_hand", SlotObservation(index, SlotState.UNKNOWN,
+                    evidence=reason))
+            self._dirty_slots.update(("in_hand", index)
+                                     for index in range(len(self._observations["in_hand"])))
+            logger.info(f"[角色证据失效] 来源={reason}，已上阵阵容沿用，仅恢复备战席识别")
+            return
         self._slot_evidence.clear()
         self._field_observed_at = self._bench_observed_at = None
+        self._field_cache_valid = False
         self._bench_dirty = True
         self._purchase_scan_baseline = None
         self._invalidate_backend_layout(reason)
@@ -1907,7 +1947,6 @@ class CurrencyWars(Executable):
         self._preparation_round = None
         self._round_read_attempts = 0
         self._all_in_decision = None
-        self._equipment_others_checked = False
         self._coin_shop_open = None
         self._clear_transaction_evidence()
         self._all_in_budget = None
@@ -1959,6 +1998,7 @@ class CurrencyWars(Executable):
         self._preparation_rewards_collected = False
         self._preparation_departure_confirmed = False
         self._field_observed_at = self._bench_observed_at = None
+        self._field_cache_valid = False
         self._slot_evidence.clear()
         self._backend_layout_observed_at = None
         self._experience_input_revision += 1
@@ -1977,6 +2017,18 @@ class CurrencyWars(Executable):
 
     def set_overclock(self, overclock: bool):
         self.is_overclock = overclock
+
+    def set_investment_priority(self, value):
+        """扩展窗口手动填写的投资策略优先项；留空时只使用攻略推荐。"""
+        self._config_investment_priorities = parse_investment_priority(value)
+
+    def _investment_priorities(self):
+        """手动填写的优先项在前，其后是攻略推荐，按名称去重。"""
+        seen = []
+        for name in self._config_investment_priorities + self.recommend_invest_strategies:
+            if name not in seen:
+                seen.append(name)
+        return tuple(seen)
 
     def page_locate(self, depth = 0) -> CurrencyWarsPage:
         """
@@ -3729,6 +3781,7 @@ class CurrencyWars(Executable):
         if not self._set_shop_open(False):
             self._invalidate_backend_layout("preparation_not_confirmed")
             self._field_observed_at = None
+            self._field_cache_valid = False
             self._population_current = self._population_read_key = None
             for area in ("on_field", "off_field"):
                 for i in range(len(self._observations[area])):
@@ -3745,6 +3798,7 @@ class CurrencyWars(Executable):
         if self._pending_move is None:
             self._placement_pending = False
         self._field_observed_at = time.monotonic()
+        self._field_cache_valid = self._field_cache_ready()
         self._reconcile_placed()
         self._confirm_main_c_fielded()
         if equip:
@@ -3773,6 +3827,7 @@ class CurrencyWars(Executable):
             # 隐藏的商店不能成为布局候选。
             if not self._set_shop_open(False):
                 self._invalidate_backend_layout("layout_unconfirmed")
+                self._field_cache_valid = False
                 self._vision.last_layout_diagnostics = {"evidence": "layout_preparation_not_confirmed"}
                 self._vision.capture_layout_failure("layout_preparation_not_confirmed")
                 return False
@@ -3892,6 +3947,7 @@ class CurrencyWars(Executable):
             logger.debug(f"[后台增量识别] 普通槽待读={len(indices)}，支援已重新双帧认证")
         self._reconcile_placed()
         self._confirm_main_c_fielded()
+        self._field_cache_valid = self._field_cache_ready()
         return self._layout_valid
 
     def _needs_equipment_check(self):
@@ -3919,7 +3975,7 @@ class CurrencyWars(Executable):
         if throttled and not self._equipment_due():
             self._equipment_metrics["skipped"] += 1
             logger.info(f"[装备节奏] skipped={self._equipment_metrics['skipped']} "
-                        f"since_check={self._equipment_battles_since_check} interval={self.equipment_interval_battles}")
+                        f"round={self._preparation_round} since_check={self._equipment_battles_since_check}")
             return False
         if throttled and self._equipment_batch_attempts >= 2:
             logger.warning("[装备节奏] 本准备期已达有限整批尝试上限，保留到期批次")
@@ -3972,15 +4028,14 @@ class CurrencyWars(Executable):
                     if not self._session_store.complete_equipment_check():
                         self._fail_battle("equipment_checkpoint_not_saved")
                 self._equipment_battles_since_check = 0
-            if self._equipment_others_available() and not priority_pending:
-                self._equipment_others_checked = True
             completed = True
             return True
         finally:
             self._equipment_batch_running = False
             if throttled and not completed:
                 self._record_checkpoint(equipment_batch_state="interrupted")
-            logger.info(f"[装备节奏] batch_completed={completed} due={self._equipment_metrics['due']} "
+            logger.info(f"[装备节奏] batch_completed={completed} round={self._preparation_round} "
+                        f"due={self._equipment_metrics['due']} "
                         f"unconfirmed={self._equipment_metrics['unconfirmed']} seconds={time.monotonic() - started:.2f}")
 
     def _equip_observation(self, area, index, obs):
@@ -4320,7 +4375,8 @@ class CurrencyWars(Executable):
                            if isinstance(item, (tuple, list)) and len(item) >= 2)
             text = re.sub(r"\s+", "", text)
             prompt = text if (any(word in text for word in ("选择", "挑选"))
-                              and any(word in text for word in ("装备", "武器", "武装箱", "角色", "专家"))) else ""
+                              and any(word in text for word in ("装备", "武器", "武装箱", "角色",
+                                                               "专家", "金币", "经验", "补给"))) else ""
             self._check_stop()
             return crop, prompt
         except ThreadStoppedError:
@@ -4435,7 +4491,7 @@ class CurrencyWars(Executable):
                 continue
             # 保留原有奖励偏好，但只有实际的装备或角色
             # 选项可见且稳定后才能应用。
-            self._invalidate_roster_evidence("supply_reward_unknown")
+            self._invalidate_supply_reward_evidence()
             if not self.operator.click_point(0.8, 0.25, tag="补给箱：选择已稳定的奖励"):
                 self._fail_supply("supply_choice_click_failed")
             self._wait_supply_result(choice_frame)
@@ -4443,6 +4499,10 @@ class CurrencyWars(Executable):
             self._invalidate_level()
         if self.operator.locate(CWIMG.OPEN) is not None:
             self._fail_supply("supply_item_limit")
+
+    def _invalidate_supply_reward_evidence(self):
+        """补给奖励只改备战席与装备；已上阵角色不重复识别，升星差异交给后续整场复核。"""
+        self._invalidate_roster_evidence("supply_reward_unknown", preserve_field=True)
 
     def _read_bench_empty_observations(self):
         """读取空位及不可用锁定槽位；两者均不代表存在角色。"""
@@ -6226,6 +6286,80 @@ class CurrencyWars(Executable):
             {"evidence": "no_confirmed_next_stage_after_boss_notice"}, critical=True)
         raise RuntimeError("强敌提示确认后仍未退场")
 
+    def _select_invest_strategy_card(self, collection):
+        """优先选攻略/配置推荐的投资策略，并避开会替换已上阵角色的卡。"""
+        centers, roi = self.INVEST_CARD_CENTERS, self.INVEST_CARDS_ROI
+        context = getattr(self.operator, "window_context", None)
+        width = getattr(context, "width", 0) or 0
+        height = getattr(context, "height", 0) or 0
+        blocked, titles = set(), {}
+        card_boxes = {}
+        try:
+            boxes = self.operator.ocr_boxes(from_x=roi[0], from_y=roi[1],
+                                            to_x=roi[2], to_y=roi[3], trace=False)
+        except (ThreadStoppedError, InterruptedError):
+            raise
+        except Exception as error:
+            self._check_stop()
+            boxes = None
+            logger.debug(f"[投资策略] 卡片文字读取失败：{type(error).__name__}")
+
+        def column_of(center_x):
+            if not width:
+                return None
+            ratio = center_x / width
+            return min(range(len(centers)), key=lambda i: abs(ratio - centers[i][0]))
+
+        for box in boxes or ():
+            text = re.sub(r"\s+", "", str(getattr(box, "source", "") or ""))
+            column = column_of(box.left + box.width / 2)
+            if not text or column is None:
+                continue
+            # 标题栏等页面文字不属于卡片，不能当作卡片证据。
+            if height and not 0.16 <= (box.top + box.height / 2) / height <= 0.62:
+                continue
+            titles.setdefault(column, [])
+            if len(titles[column]) < 3:
+                titles[column].append(text[:40])
+            card_boxes.setdefault(column, box)
+            if any(word in text for word in self.FIELD_REPLACING_INVESTMENTS):
+                blocked.add(column)
+        collection_column = column_of(collection.center[0]) if collection is not None else None
+        priorities = self._investment_priorities()
+        priority_hit = None
+        for name in priorities:
+            if any(word in name for word in self.FIELD_REPLACING_INVESTMENTS):
+                logger.warning(f"[投资策略] 优先项={name} 会替换已上阵角色，跳过")
+                continue
+            for column in (1, 0, 2):
+                if column in blocked:
+                    continue
+                if any(name in text for text in titles.get(column, ())):
+                    priority_hit = (name, column)
+                    break
+            if priority_hit is not None:
+                break
+        if priority_hit is not None:
+            target = priority_hit[1]
+            logger.info(f"[投资策略] 优先命中={priority_hit[0]} 选择={target} 卡片={titles}")
+        else:
+            target = None
+            if collection_column is not None and collection_column not in blocked:
+                target = collection_column
+            if target is None:
+                target = next((index for index in (1, 0, 2) if index not in blocked), 1)
+            if priorities:
+                logger.info(f"[投资策略] 优先项未命中，沿用默认选择={target} 卡片={titles}")
+            elif titles or blocked:
+                logger.info(f"[投资策略] 卡片={titles} 避开={sorted(blocked)} 选择={target}")
+        if priority_hit is None and collection is not None and target == collection_column:
+            return self.operator.click_box(collection)
+        box = card_boxes.get(target)
+        if box is not None:
+            return self.operator.click_box(box)
+        return self.operator.click_point(*centers[target], after_sleep=0.5,
+                                         tag=f"选择第{target + 1}张投资策略")
+
     def handle_invest_strategy(self, prev_stage: StageName | None) -> bool:
         """处理投资策略选择界面的逻辑"""
         deadline = self._page_navigation_limit(self.EVENT_TRANSITION_TIMEOUT)
@@ -6235,8 +6369,7 @@ class CurrencyWars(Executable):
         self._invalidate_roster_evidence("investment_reward_unknown")
         self._check_page_navigation_deadline(deadline)
         self._record_runtime_node_input(CWIMG.SELECT_INVEST_STRATEGY)
-        selected = (self.operator.click_box(collection) if collection is not None else
-                    self.operator.click_point(0.5, 0.3, after_sleep=0.5, tag="选择中间的投资策略"))
+        selected = self._select_invest_strategy_card(collection)
         if not selected:
             return False  # False 也可能已经生效，保留收据，不能改点另一选项。
         self._confirm_invest_strategy(deadline)
@@ -6277,7 +6410,8 @@ class CurrencyWars(Executable):
     def handle_replenish_stage(self, _: StageName | None):
         """处理补给阶段的逻辑"""
         self._check_page_navigation_deadline()
-        self._invalidate_roster_evidence("replenish_reward_unknown")
+        # 补给阶段不替换已上阵角色；同名升星差异按约定不再触发整场重扫。
+        self._invalidate_roster_evidence("replenish_reward_unknown", preserve_field=True)
         self._check_page_navigation_deadline()
         self._record_runtime_node_input(CWIMG.REPLENISH_STAGE)
         if not self.operator.click_point(0.53, 0.52, after_sleep=1):  # 选择固定位置
@@ -7015,15 +7149,14 @@ class CurrencyWars(Executable):
                     f"equipment_since_check={self._equipment_battles_since_check} evidence={evidence}")
         return True
 
-    def _equipment_others_available(self):
-        return (self.equipment_config is not None and self._preparation_round is not None
-                and self._preparation_round >= self.equipment_config.others_from_round)
-
     def _equipment_due(self):
-        if self.equipment_config is not None:
-            self._read_preparation_round()
-            if self._equipment_others_available() and not self._equipment_others_checked:
-                return True
+        """装备只在每个位面的第4个节点和最后一个节点处理。"""
+        current = self._read_preparation_round()
+        if current is not None:
+            return is_equipment_round(current) and (
+                self._equipment_dirty or self._needs_equipment_check())
+        # 关卡无法确认时不能判断节点，按战斗间隔兜底，避免整局不检查装备。
+        logger.debug("[装备节奏] 备战关卡未确认，按战斗间隔兜底")
         if self.equipment_interval_battles is None:
             return self._equipment_dirty or self._needs_equipment_check()
         return self._equipment_battles_since_check >= self.equipment_interval_battles
@@ -8824,6 +8957,7 @@ class CurrencyWars(Executable):
             main_c_search_level=search_level if main_c else None)
         opening_policy = parse_opening_policy_config(data.get("opening_policy"))
         reward_fast_rounds = parse_reward_fast_rounds(data.get("reward_fast_rounds"))
+        recommend_invest = parse_investment_priority(data.get("recommend_invest_strategies"))
         equipment_interval = data.get("equipment_interval_battles")
         if "equipment_interval_battles" in data and (type(equipment_interval) is not int or equipment_interval <= 0):
             raise ValueError("equipment_interval_battles 必须为正整数")
@@ -8882,6 +9016,7 @@ class CurrencyWars(Executable):
         self.mid_level = data.get("mid_level", 7)
         self.strategy_code = data.get("share_code", "")
         self.strategy_special_events = data.get("special_events", {})
+        self.recommend_invest_strategies = recommend_invest
         self.main_c = main_c
         self.opening_policy_config = opening_policy
         self.reward_fast_rounds = reward_fast_rounds
@@ -8914,11 +9049,11 @@ class CurrencyWars(Executable):
         self._all_in_decision = None
         self.equipment_config = None
         self._all_in_budget = None
-        self._equipment_others_checked = False
         self.equipment_interval_battles = None
         self.strategy_characters.clear()
         self.strategy_code = ""
         self.strategy_special_events.clear()
+        self.recommend_invest_strategies = ()
         self.formation_config = None
         self._effective_targets = None
         self._formation_plan = ()

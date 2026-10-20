@@ -41,6 +41,28 @@ def parse_preparation_round(text: str) -> tuple[int, int] | None:
     return (int(match[1]), int(match[2])) if match is not None else None
 
 
+def parse_investment_priority(value) -> tuple[str, ...]:
+    """解析推荐投资策略：分号分隔字符串或字符串数组，按出现顺序去重。"""
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        parts = re.split(r"[;；\n]+", value)
+    elif isinstance(value, (list, tuple)):
+        parts = []
+        for item in value:
+            if not isinstance(item, str):
+                raise ValueError("recommend_invest_strategies 必须为字符串或字符串数组")
+            parts.extend(re.split(r"[;；\n]+", item))
+    else:
+        raise ValueError("recommend_invest_strategies 必须为字符串或字符串数组")
+    result = []
+    for part in parts:
+        name = re.sub(r"\s+", "", part)
+        if name and name not in result:
+            result.append(name)
+    return tuple(result)
+
+
 def parse_experience_progress(text: str, *, level: int) -> tuple[int, int] | None:
     """将唯一的进度分数关联到相邻且明确的商店等级。
     人口分数、无关数字、混合帧和冲突标签都不能作为花费保留金币的报价依据。
