@@ -27,6 +27,11 @@ class CurrencyWarsPage(enum.IntEnum):
     UNKNOWN = -1
 
 
+# 当前对局节点数：位面1 共9个（1-9首领），位面2/3 各7个（2-7/3-7首领）。
+# 装备只在每个位面的第4个节点和最后一个节点处理，其余节点不打开装备面板。
+EQUIPMENT_ROUNDS = frozenset({(1, 4), (1, 9), (2, 4), (2, 7), (3, 4), (3, 7)})
+
+
 class StageName(enum.StrEnum):
     """关卡阶段名称枚举"""
     FORTUNE_TELLER = '命运卜者'
@@ -513,16 +518,41 @@ class CurrencyWars(Executable):
             self.shopping()
 
             run_times += 1
-            if run_times % 2 == 0:  # 每2轮更新一次前台角色，顺便穿戴装备
+            current_round = self._read_preparation_round()
+            if current_round is not None:
+                is_equipment_round = current_round in EQUIPMENT_ROUNDS
+            else:
+                # 备战关卡未识别时按战斗间隔兜底，避免整局不检查装备
+                logger.debug(f"备战关卡未识别（第{run_times}轮），按战斗间隔兜底检查装备")
+                is_equipment_round = run_times % 2 == 0
+            if is_equipment_round:  # 装备只在每个位面的第4个节点和最后一个节点处理
                 self.refresh_character()
                 self.sort_all_areas_by_priority()  # 优先级排序
+            elif run_times % 2 == 0:  # 每2轮更新一次前台角色信息，不打开装备面板
+                self.refresh_character(equip=False)
         # 游戏循环结束，重置角色状态
         self.reset_character()
         return True
 
-    def refresh_character(self):
+    def _read_preparation_round(self) -> tuple[int, int] | None:
+        """OCR识别左上角"备战阶段 X-Y"标签，返回(位面, 节点)；无法识别时返回None。"""
+        rois = ((0.105, 0.02, 0.18, 0.135), (0.205, 0.02, 0.285, 0.105))
+        for from_x, from_y, to_x, to_y in rois:
+            rows = self.operator.ocr(from_x=from_x, from_y=from_y, to_x=to_x, to_y=to_y)
+            if not rows:
+                continue
+            normalized = re.sub(r"\s", "", " ".join(str(row[1]) for row in rows))
+            if "备战阶段" not in normalized:
+                continue
+            match = re.search(r"([1-9])-([1-9])", normalized)
+            if match:
+                logger.debug(f"当前备战关卡：{match[1]}-{match[2]}")
+                return int(match[1]), int(match[2])
+        return None
+
+    def refresh_character(self, equip: bool = True):
         """ 刷新角色信息，确保备战席中未放置的角色状态正确。 """
-        self.get_on_field_area(True)
+        self.get_on_field_area(True, equip=equip)
         self.operator.sleep(0.3)
         boxes = self.operator.rectangle_detect(120, 150, 130, 150,
                                                from_x=0.1, from_y=0.52, to_x=0.86, to_y=0.7,
@@ -539,7 +569,7 @@ class CurrencyWars(Executable):
                     [None] * (len(self.off_field_area) - len(self.off_field_character))
                 )
             logger.info(f"当前后台共有 {len(self.off_field_area)} 个位置")
-        self.get_off_field_area(True)
+        self.get_off_field_area(True, equip=equip)
         self.operator.sleep(0.3)
         field_characters = self.on_field_character + self.off_field_character
         for c in self.in_hand_character:
@@ -649,10 +679,10 @@ class CurrencyWars(Executable):
 
         return target_character_list
 
-    def get_off_field_area(self, force=False):
+    def get_off_field_area(self, force=False, equip: bool = True):
         """获取后台角色信息"""
         self._get_character_in_area(areas=self.off_field_area, target_character_list=self.off_field_character,
-                                    equip=True,
+                                    equip=equip,
                                     force=force,
                                     count_stars=True,
                                     use_backup_ocr=True)
@@ -661,10 +691,10 @@ class CurrencyWars(Executable):
                 char.is_placed = True
         logger.info(f"当前后台角色：{self.off_field_character}")
 
-    def get_on_field_area(self, force=False):
+    def get_on_field_area(self, force=False, equip: bool = True):
         """获取前台角色信息"""
         self._get_character_in_area(areas=self.on_field_area, target_character_list=self.on_field_character,
-                                    equip=True,
+                                    equip=equip,
                                     force=force,
                                     count_stars=True)
         for char in self.on_field_character:
