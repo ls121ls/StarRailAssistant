@@ -138,6 +138,10 @@ class CurrencyWars(Executable):
 
     SHOP_EXPERIENCE_COST = 4  # 这是本玩法单次 F 输入的价格，并非整级升级价格。
 
+    # 淘金客：选中后每次消耗金币刷新商店都会获得经验，故以刷新代替购买经验。
+    GOLD_DIGGER_STRATEGY = "淘金客"
+    GOLD_DIGGER_MIN_COINS = 10  # 淘金客升级刷新仍需保留的最小金币。
+
     def __init__(self, operator, runtimes, *, data_dir=None):
         super().__init__(operator)
         # 扩展存档和诊断使用独立目录，避免与原版任务互相覆盖。
@@ -203,6 +207,7 @@ class CurrencyWars(Executable):
         self.recommend_invest_strategies: tuple[str, ...] = ()  # 攻略推荐的投资策略（按优先级）
         self._config_investment_priorities: tuple[str, ...] = ()  # 扩展窗口手动填写的优先项
         self.is_overclock = False  # 超频博弈
+        self._gold_digger_selected = False  # 本局是否已选中【淘金客】投资策略
         self.is_complex_invest_strategy_selection_enabled = False  # 是否启用复杂投资策略选择逻辑
         self._default_off_field_area = list(self.off_field_area)
         self.main_c = None
@@ -1939,6 +1944,7 @@ class CurrencyWars(Executable):
         self.is_continue = False
         self._runtime_node_pending = None
         self._invest_simple_equipment_pending = False
+        self._gold_digger_selected = False
         self._last_selection_sent = False
         self._selection_event_pending = None
         self._economy_stage_index = None
@@ -6352,6 +6358,14 @@ class CurrencyWars(Executable):
                 logger.info(f"[投资策略] 优先项未命中，沿用默认选择={target} 卡片={titles}")
             elif titles or blocked:
                 logger.info(f"[投资策略] 卡片={titles} 避开={sorted(blocked)} 选择={target}")
+        # 淘金客：本局一旦选中该投资策略，后续升级将用刷新代替购买经验。
+        if not self._gold_digger_selected:
+            chosen_text = "".join(titles.get(target, ()))
+            if self.GOLD_DIGGER_STRATEGY in chosen_text or (
+                    priority_hit is not None and self.GOLD_DIGGER_STRATEGY in priority_hit[0]):
+                self._gold_digger_selected = True
+                logger.info(f"[投资策略] 检测到【{self.GOLD_DIGGER_STRATEGY}】，"
+                            f"后续升级将以刷新代替购买经验（保留最小金币 {self.GOLD_DIGGER_MIN_COINS}）")
         if priority_hit is None and collection is not None and target == collection_column:
             return self.operator.click_box(collection)
         box = card_boxes.get(target)
@@ -7183,7 +7197,8 @@ class CurrencyWars(Executable):
             upgrade_allowed=allowed, has_purchase_targets=bool(unmet),
             space_safe=self._economy_space_safe(unmet), needs_prepare=needs_prepare,
             first_main_search=searching_main, gate_has_purchase_targets=actionable,
-            first_main_purchase_reserve_gold=self.main_c_search_purchase_reserve_gold)
+            first_main_purchase_reserve_gold=self.main_c_search_purchase_reserve_gold,
+            gold_digger=self._gold_digger_selected)
         if decision.action == "roll" and not self._opening_action_allowed("refresh"):
             return "opening_round_unknown" if self._preparation_round is None else "opening_refresh_locked"
         return decision.reason if decision.action in ("save", "prepare") else None
@@ -7734,7 +7749,9 @@ class CurrencyWars(Executable):
                 decision = next_final_round_action(level=level, coins=coins,
                     experience_current=progress[0] if progress else None,
                     experience_required=progress[1] if progress else None,
-                    level_capped=progress == (0, 0), xp_cost=xp_cost)
+                    level_capped=progress == (0, 0), xp_cost=xp_cost,
+                    gold_digger=self._gold_digger_selected, roll_cost=roll_cost,
+                    gold_digger_min_coins=self.GOLD_DIGGER_MIN_COINS)
                 logger.info(f"[终局运营] L={level} gold={coins} xp={progress} "
                     f"next_level={decision.target_level} upgrade_cost={decision.upgrade_cost} "
                     f"action={decision.action} reason={decision.reason}")
@@ -7837,7 +7854,8 @@ class CurrencyWars(Executable):
                 if roll_cost is None:
                     result, reason = ActionResult.INDETERMINATE, "unknown_roll_cost"
                     break
-                if coins < roll_cost:
+                if coins < roll_cost or (self._gold_digger_selected
+                        and coins - roll_cost < self.GOLD_DIGGER_MIN_COINS):
                     reason = "final_round_gold_exhausted" if coins == 0 else "final_round_no_affordable_action"
                     logger.info(f"[终局运营] 剩余金币={coins}，当前商店无可买需求牌且不足刷新费用")
                     break
@@ -8202,7 +8220,7 @@ class CurrencyWars(Executable):
                         limits[key] = max(limits[key], self._all_in_budget)
                 logger.info(f"[搜牌预算] 首次主C搜索={searching_main} 等级={level} 金币={coins} "
                             f"有效保留={reserve} 刷新费用={self.SHOP_REFRESH_COST}")
-                if final_push:
+                if final_push and not self._gold_digger_selected:
                     actions = prior["attempts"] + prior["refreshes"] + prior["experiences"] + attempted + refreshes + experiences
                     if actions >= limits["actions"] or prior["experiences"] + experiences >= limits["experiences"]:
                         reason = "experience_budget"
@@ -8254,7 +8272,7 @@ class CurrencyWars(Executable):
                             space_safe=purchase_cycle["spaces"] > 0 and not full_bench_recovered,
                             needs_prepare=needs_prepare, first_main_search=searching_main,
                             first_main_purchase_reserve_gold=self.main_c_search_purchase_reserve_gold,
-                            gate_has_purchase_targets=actionable)
+                            gate_has_purchase_targets=actionable, gold_digger=self._gold_digger_selected)
                         gate = self.formation_config.upgrade_gate if self.formation_config else None
                         gate_ready = gate is not None and any(name in purchase_cycle["receipts"] and
                             purchase_cycle["before"][name] + purchase_cycle["receipts"][name] >= 3 ** (stars - 1)
@@ -8594,7 +8612,8 @@ class CurrencyWars(Executable):
                             upgrade_allowed=allowed, has_purchase_targets=None if demand_unknown else bool(unmet),
                             space_safe=False if full_bench_recovered else space_safe, needs_prepare=needs_prepare,
                             first_main_search=searching_main, gate_has_purchase_targets=gate_actionable,
-                            first_main_purchase_reserve_gold=self.main_c_search_purchase_reserve_gold)
+                            first_main_purchase_reserve_gold=self.main_c_search_purchase_reserve_gold,
+                            gold_digger=self._gold_digger_selected)
                     logger.info(f"[经济决策] mode=stages stage={stage_selection.index} stage_reason={stage_selection.reason} "
                         f"battles={self._confirmed_battle_count} L={level} target={effective_target} gold={coins} R={reserve} "
                         f"P={0 if all_in else self.main_c_search_purchase_reserve_gold if searching_main else self.economy_config.purchase_reserve_gold} xp_cost={xp_cost} "
@@ -8612,7 +8631,8 @@ class CurrencyWars(Executable):
                     break
                 if (economy_decision is not None and economy_decision.action == "buy_xp" or
                         economy_decision is None and (level < self.min_level or refreshed_offer and allow_mid_upgrade and level < self.mid_level
-                        and not purchased_in_offer) and coins >= xp_cost and self._can_upgrade(level)):
+                        and not purchased_in_offer) and coins >= xp_cost and self._can_upgrade(level)
+                        and not self._gold_digger_selected):
                     if prior["experiences"] + experiences >= limits["experiences"]:
                         reason = "experience_budget"
                         break
@@ -8637,6 +8657,12 @@ class CurrencyWars(Executable):
                         offer = None
                     refreshed_offer = False
                     continue
+                # 淘金客（旧经济模式）：购买经验已在上方的 legacy 分支被跳过，
+                # 改为落入下方统一刷新；刷新前仍需保留最大(配置底线, 10) 金币。
+                if (self._gold_digger_selected and economy_decision is None and roll_cost
+                        and coins - roll_cost < max(reserve, self.GOLD_DIGGER_MIN_COINS)):
+                    reason = "gold_digger_reserve"
+                    break
                 if economy_decision is None and roll_cost != 0 and ((searching_main and
                         coins - roll_cost < reserve + self.main_c_search_purchase_reserve_gold)
                         or (not searching_main and not self.is_overclock and coins < reserve)):

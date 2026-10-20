@@ -194,6 +194,7 @@ def next_final_round_action(
     *, level: int | None, coins: int | None,
     experience_current: int | None = None, experience_required: int | None = None,
     level_capped: bool = False, xp_cost: int = 4, xp_gain: int = 4,
+    gold_digger: bool = False, roll_cost: int = 2, gold_digger_min_coins: int = 10,
 ) -> FinalRoundDecision:
     """在最终回合花完金币，仅在预算足够完成下一整级时升级。
     回合检测由调用方负责，每次动作后都必须重新观测。
@@ -211,6 +212,14 @@ def next_final_round_action(
         return FinalRoundDecision("shop", "final_round_level_capped")
     if coins < xp_cost:
         return FinalRoundDecision("shop", "final_round_insufficient_xp_gold")
+    if gold_digger:
+        # 淘金客：每次消耗金币刷新商店都会获得经验，用刷新代替购买经验补级；
+        # 保留最小金币不低于配置底线与阈值中的较大值。
+        if not _nonnegative_int(roll_cost):
+            return FinalRoundDecision("recover", "final_round_unknown_roll_cost")
+        if roll_cost == 0 or coins - roll_cost >= gold_digger_min_coins:
+            return FinalRoundDecision("shop", "gold_digger_xp_roll")
+        return FinalRoundDecision("save", "gold_digger_reserve")
     target_level = level + 1
     cost = experience_cost_to_target(
         level=level, target_level=target_level,
@@ -337,6 +346,7 @@ def next_economy_action(
     space_safe: bool | None = True, needs_prepare: bool = False,
     first_main_search: bool = False, gate_has_purchase_targets: bool | None = False,
     first_main_purchase_reserve_gold: int = 0,
+    gold_digger: bool = False, gold_digger_min_coins: int = 10,
 ) -> EconomyDecision:
     """当前商店中可负担的目标购买完后，选择一个动作。
     调用方应在应用现有首个主力角色规则后提供实际目标与保留量。
@@ -362,6 +372,15 @@ def next_economy_action(
         if type(upgrade_allowed) is not bool:
             return EconomyDecision("recover", "upgrade_gate_unknown")
         if upgrade_allowed:
+            if gold_digger:
+                # 淘金客：刷新商店即可获得经验，用刷新代替购买经验；
+                # 保留最小金币不低于配置底线与阈值中的较大值。
+                gd_floor = max(reserve_gold, gold_digger_min_coins)
+                if not _nonnegative_int(roll_cost):
+                    return EconomyDecision("recover", "unknown_roll_cost")
+                if roll_cost == 0 or coins - roll_cost >= gd_floor:
+                    return EconomyDecision("roll", "gold_digger_experience_roll")
+                return EconomyDecision("save", "gold_digger_reserve")
             if not _nonnegative_int(xp_cost):
                 return EconomyDecision("recover", "unknown_xp_cost")
             # 明确观测到的免费输入不会继续降低已经偏低的余额。
