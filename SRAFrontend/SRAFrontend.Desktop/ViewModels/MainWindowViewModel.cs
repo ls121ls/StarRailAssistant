@@ -40,7 +40,6 @@ public partial class MainWindowViewModel(
     {
         await commonModel.CleanupOldExeAsync();
         await commonModel.CheckAnnouncementAsync();
-        await commonModel.CheckForUpdatesAsync();
         await commonModel.CheckDesktopShortcut();
     }
 

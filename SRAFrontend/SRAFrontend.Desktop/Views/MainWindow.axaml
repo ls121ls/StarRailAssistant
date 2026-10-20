@@ -31,19 +31,6 @@
     </suki:SukiWindow.RightWindowTitleBarControls>
 
     <suki:SukiSideMenu ItemsSource="{Binding Pages}">
-        <suki:SukiSideMenu.Styles>
-            <Style Selector="Image.AppIcon">
-                <Setter Property="Transitions">
-                    <Transitions>
-                        <DoubleTransition Property="Opacity" Duration="0.1" />
-                    </Transitions>
-                </Setter>
-                <Style Selector="^:pointerover">
-                    <Setter Property="Opacity" Value="{DynamicResource ThemeDisabledOpacity}" />
-                </Style>
-            </Style>
-        </suki:SukiSideMenu.Styles>
-        
         <suki:SukiSideMenu.ItemTemplate>
             <DataTemplate>
                 <suki:SukiSideMenuItem Classes="Compact" Header="{Binding DisplayName}">
@@ -56,15 +43,9 @@
         
         <suki:SukiSideMenu.HeaderContent>
             <StackPanel>
-                <Image Width="80"
-                       Height="80"
-                       Margin="30,10,30,30"
-                       Classes="AppIcon"
-                       Source="/Assets/SRAico.png"
-                       ToolTip.Tip="Just Icon." />
                 <TextBlock TextWrapping="Wrap" FontSize="16"
                            Text="{Binding GreetingMessage}"
-                           HorizontalAlignment="Center" TextAlignment="Center"/>
+                           HorizontalAlignment="Center" TextAlignment="Center" Margin="0,10,0,30"/>
             </StackPanel>
         </suki:SukiSideMenu.HeaderContent>
         
