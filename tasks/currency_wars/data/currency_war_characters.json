@@ -1,0 +1,3593 @@
+{
+  "meta": {
+    "source": "https://wiki.biligame.com/sr/%E8%A7%92%E8%89%B2%E4%B8%80%E8%A7%88%EF%BC%88%E8%B4%A7%E5%B8%81%EF%BC%89",
+    "index_page": "角色一览（货币）",
+    "fetched_at": "2026-10-09T09:47:34+08:00",
+    "count": 72,
+    "bond_kinds": {
+      "仙舟": "阵营羁绊",
+      "狼狩": "阵营羁绊",
+      "夜之半神": "阵营羁绊",
+      "昼之半神": "阵营羁绊",
+      "贝洛伯格": "阵营羁绊",
+      "列车同行": "阵营羁绊",
+      "银河学者": "阵营羁绊",
+      "星间旅人": "阵营羁绊",
+      "盛会之星": "阵营羁绊",
+      "巡海游侠": "阵营羁绊",
+      "星核猎手": "阵营羁绊",
+      "公司": "阵营羁绊",
+      "命运圣杯": "阵营羁绊",
+      "击破": "流派羁绊",
+      "追击": "流派羁绊",
+      "能量": "流派羁绊",
+      "群攻": "流派羁绊",
+      "燃血": "流派羁绊",
+      "减益": "流派羁绊",
+      "持续伤害": "流派羁绊",
+      "战技点": "流派羁绊",
+      "量子同频": "流派羁绊",
+      "治疗": "流派羁绊",
+      "护盾": "流派羁绊",
+      "欢愉": "流派羁绊",
+      "命运卜者": "独立羁绊",
+      "大守护者": "独立羁绊",
+      "魔术师": "独立羁绊",
+      "挚爱之人": "独立羁绊",
+      "救世主": "独立羁绊",
+      "头号玩家": "独立羁绊",
+      "领航员": "独立羁绊"
+    }
+  },
+  "bonds": {
+    "夜之半神": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "万敌",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "赛飞儿",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "丹恒·腾荒",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "护盾"
+          ]
+        },
+        {
+          "name": "刻律德菈",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "遐蝶",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "长夜月",
+          "cost": 4,
+          "position": "前后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "昔涟",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        }
+      ],
+      "count": 7
+    },
+    "燃血": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "万敌",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "刃",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "千冶·刃",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "风堇",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "输出"
+          ]
+        },
+        {
+          "name": "镜流",
+          "cost": 3,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "遐蝶",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "长夜月",
+          "cost": 4,
+          "position": "前后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "布洛妮娅",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        }
+      ],
+      "count": 8
+    },
+    "列车同行": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "三月七",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "护盾"
+          ]
+        },
+        {
+          "name": "丹恒·饮月",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "姬子",
+          "cost": 3,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "姬子·启行",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "星期日",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "开拓者•欢愉",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "开拓者•记忆",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "瓦尔特",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 8
+    },
+    "护盾": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "三月七",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "护盾"
+          ]
+        },
+        {
+          "name": "丹恒·腾荒",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "护盾"
+          ]
+        },
+        {
+          "name": "砂金",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "护盾",
+            "输出"
+          ]
+        },
+        {
+          "name": "杰帕德",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "护盾",
+            "输出"
+          ]
+        }
+      ],
+      "count": 4
+    },
+    "击破": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "乱破",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "加拉赫",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "治疗"
+          ]
+        },
+        {
+          "name": "大丽花",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "灵砂",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "输出"
+          ]
+        },
+        {
+          "name": "阮·梅",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "姬子",
+          "cost": 3,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "忘归人",
+          "cost": 3,
+          "position": "后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "波提欧",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "流萤",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 9
+    },
+    "巡海游侠": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "乱破",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "不死途",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "黄泉",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "波提欧",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 4
+    },
+    "仙舟": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "停云",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "爻光",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "藿藿",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "青雀",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "丹恒·饮月",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "忘归人",
+          "cost": 3,
+          "position": "后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "彦卿",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "符玄",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "景元",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 9
+    },
+    "能量": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "停云",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "藿藿",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "阿格莱雅",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "吉尔伽美什",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "Saber",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "星期日",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "开拓者•欢愉",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "开拓者•记忆",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "云璃",
+          "cost": 5,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 9
+    },
+    "星核猎手": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "刃",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "千冶·刃",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "卡芙卡",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "银狼LV.999",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "银狼",
+          "cost": 4,
+          "position": "前后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "流萤",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 6
+    },
+    "治疗": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "加拉赫",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "治疗"
+          ]
+        },
+        {
+          "name": "藿藿",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "灵砂",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "输出"
+          ]
+        },
+        {
+          "name": "风堇",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "输出"
+          ]
+        },
+        {
+          "name": "娜塔莎",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "治疗"
+          ]
+        },
+        {
+          "name": "符玄",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "罗刹",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 7
+    },
+    "盛会之星": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "加拉赫",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "治疗"
+          ]
+        },
+        {
+          "name": "大丽花",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "花火",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "星期日",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "知更鸟",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "黑天鹅",
+          "cost": 5,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 6
+    },
+    "持续伤害": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "桑博",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "椒丘",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "艾丝妲",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "卡芙卡",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "海瑟音",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "黑天鹅",
+          "cost": 5,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 6
+    },
+    "星间旅人": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "桑博",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "绯英",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "银枝",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "真理医生",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "火花",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "罗刹",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "瓦尔特",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 7
+    },
+    "贝洛伯格": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "桑博",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "佩拉",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "娜塔莎",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "治疗"
+          ]
+        },
+        {
+          "name": "希儿",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "杰帕德",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "护盾",
+            "输出"
+          ]
+        },
+        {
+          "name": "布洛妮娅",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        }
+      ],
+      "count": 6
+    },
+    "减益": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "椒丘",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "赛飞儿",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "佩拉",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "千冶·刃",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "黄泉",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "彦卿",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "瓦尔特",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 7
+    },
+    "狼狩": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "椒丘",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "貊泽",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "飞霄",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "灵砂",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "输出"
+          ]
+        },
+        {
+          "name": "镜流",
+          "cost": 3,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "彦卿",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "云璃",
+          "cost": 5,
+          "position": "后台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 7
+    },
+    "欢愉": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "爻光",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "绯英",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "银狼LV.999",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "开拓者•欢愉",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "火花",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 5
+    },
+    "公司": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "翡翠",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "砂金",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "护盾",
+            "输出"
+          ]
+        },
+        {
+          "name": "托帕&账账",
+          "cost": 5,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 3
+    },
+    "群攻": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "翡翠",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "黑塔",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "缇宝",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "银枝",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "那刻夏",
+          "cost": 3,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "大黑塔",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "景元",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 7
+    },
+    "银河学者": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "艾丝妲",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "黑塔",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "阮·梅",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "真理医生",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "大黑塔",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 5
+    },
+    "追击": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "貊泽",
+          "cost": 1,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "赛飞儿",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "飞霄",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "不死途",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "砂金",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "护盾",
+            "输出"
+          ]
+        },
+        {
+          "name": "真理医生",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "知更鸟",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "托帕&账账",
+          "cost": 5,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 8
+    },
+    "命运圣杯": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "远坂凛",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "吉尔伽美什",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "Saber",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "Archer",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 4
+    },
+    "战技点": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "远坂凛",
+          "cost": 1,
+          "position": "前后台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "青雀",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "丹恒·饮月",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "花火",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "刻律德菈",
+          "cost": 3,
+          "position": "前后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "火花",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "Archer",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 7
+    },
+    "昼之半神": {
+      "kind": "阵营羁绊",
+      "members": [
+        {
+          "name": "阿格莱雅",
+          "cost": 1,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "缇宝",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "风堇",
+          "cost": 2,
+          "position": "前台",
+          "tags": [
+            "治疗",
+            "输出"
+          ]
+        },
+        {
+          "name": "那刻夏",
+          "cost": 3,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        },
+        {
+          "name": "海瑟音",
+          "cost": 4,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "昔涟",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        }
+      ],
+      "count": 6
+    },
+    "量子同频": {
+      "kind": "流派羁绊",
+      "members": [
+        {
+          "name": "缇宝",
+          "cost": 2,
+          "position": "前后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        },
+        {
+          "name": "花火",
+          "cost": 2,
+          "position": "后台",
+          "tags": [
+            "辅助"
+          ]
+        },
+        {
+          "name": "希儿",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        },
+        {
+          "name": "符玄",
+          "cost": 4,
+          "position": "后台",
+          "tags": [
+            "治疗",
+            "辅助"
+          ]
+        },
+        {
+          "name": "银狼",
+          "cost": 4,
+          "position": "前后台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        }
+      ],
+      "count": 5
+    },
+    "领航员": {
+      "kind": "独立羁绊",
+      "members": [
+        {
+          "name": "姬子·启行",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 1
+    },
+    "救世主": {
+      "kind": "独立羁绊",
+      "members": [
+        {
+          "name": "白厄",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 1
+    },
+    "头号玩家": {
+      "kind": "独立羁绊",
+      "members": [
+        {
+          "name": "银狼LV.999",
+          "cost": 3,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 1
+    },
+    "魔术师": {
+      "kind": "独立羁绊",
+      "members": [
+        {
+          "name": "Archer",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "输出"
+          ]
+        }
+      ],
+      "count": 1
+    },
+    "大守护者": {
+      "kind": "独立羁绊",
+      "members": [
+        {
+          "name": "布洛妮娅",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        }
+      ],
+      "count": 1
+    },
+    "挚爱之人": {
+      "kind": "独立羁绊",
+      "members": [
+        {
+          "name": "昔涟",
+          "cost": 5,
+          "position": "前台",
+          "tags": [
+            "辅助",
+            "输出"
+          ]
+        }
+      ],
+      "count": 1
+    },
+    "命运卜者": {
+      "kind": "独立羁绊",
+      "members": [
+        {
+          "name": "黑天鹅",
+          "cost": 5,
+          "position": "后台",
+          "tags": [
+            "输出",
+            "辅助"
+          ]
+        }
+      ],
+      "count": 1
+    }
+  },
+  "characters": [
+    {
+      "name": "万敌",
+      "wiki_name": "万敌",
+      "wiki_page": "货币战争/万敌",
+      "cost": 1,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "夜之半神",
+        "燃血"
+      ],
+      "bond_kinds": {
+        "夜之半神": "阵营羁绊",
+        "燃血": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "万敌",
+        "cost": 2,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": [
+        "费用 注册表2 != wiki1"
+      ]
+    },
+    {
+      "name": "三月七",
+      "wiki_name": "三月七",
+      "wiki_page": "货币战争/三月七",
+      "cost": 1,
+      "position": "后台",
+      "tags": [
+        "护盾"
+      ],
+      "bonds": [
+        "列车同行",
+        "护盾"
+      ],
+      "bond_kinds": {
+        "列车同行": "阵营羁绊",
+        "护盾": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "三月七",
+        "cost": 1,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "乱破",
+      "wiki_name": "乱破",
+      "wiki_page": "货币战争/乱破",
+      "cost": 1,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "击破",
+        "巡海游侠"
+      ],
+      "bond_kinds": {
+        "击破": "流派羁绊",
+        "巡海游侠": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "乱破",
+        "cost": 1,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "停云",
+      "wiki_name": "停云",
+      "wiki_page": "货币战争/停云",
+      "cost": 1,
+      "position": "后台",
+      "tags": [
+        "辅助"
+      ],
+      "bonds": [
+        "仙舟",
+        "能量"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "停云",
+        "cost": 1,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "刃",
+      "wiki_name": "刃",
+      "wiki_page": "货币战争/刃",
+      "cost": 1,
+      "position": "后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "星核猎手",
+        "燃血"
+      ],
+      "bond_kinds": {
+        "星核猎手": "阵营羁绊",
+        "燃血": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "刃",
+        "cost": 1,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "加拉赫",
+      "wiki_name": "加拉赫",
+      "wiki_page": "货币战争/加拉赫",
+      "cost": 1,
+      "position": "前后台",
+      "tags": [
+        "治疗"
+      ],
+      "bonds": [
+        "击破",
+        "治疗",
+        "盛会之星"
+      ],
+      "bond_kinds": {
+        "击破": "流派羁绊",
+        "治疗": "流派羁绊",
+        "盛会之星": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "加拉赫",
+        "cost": 1,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "大丽花",
+      "wiki_name": "大丽花",
+      "wiki_page": "货币战争/大丽花",
+      "cost": 1,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "击破",
+        "盛会之星"
+      ],
+      "bond_kinds": {
+        "击破": "流派羁绊",
+        "盛会之星": "阵营羁绊"
+      },
+      "version": "4.0",
+      "expert": false,
+      "registry": {
+        "name": "大丽花",
+        "cost": 1,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "桑博",
+      "wiki_name": "桑博",
+      "wiki_page": "货币战争/桑博",
+      "cost": 1,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "持续伤害",
+        "星间旅人",
+        "贝洛伯格"
+      ],
+      "bond_kinds": {
+        "持续伤害": "流派羁绊",
+        "星间旅人": "阵营羁绊",
+        "贝洛伯格": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "桑博",
+        "cost": 1,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "椒丘",
+      "wiki_name": "椒丘",
+      "wiki_page": "货币战争/椒丘",
+      "cost": 1,
+      "position": "前台",
+      "tags": [
+        "治疗",
+        "辅助"
+      ],
+      "bonds": [
+        "减益",
+        "持续伤害",
+        "狼狩"
+      ],
+      "bond_kinds": {
+        "减益": "流派羁绊",
+        "持续伤害": "流派羁绊",
+        "狼狩": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "椒丘",
+        "cost": 1,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "爻光",
+      "wiki_name": "爻光",
+      "wiki_page": "货币战争/爻光",
+      "cost": 1,
+      "position": "前后台",
+      "tags": [
+        "辅助"
+      ],
+      "bonds": [
+        "仙舟",
+        "欢愉"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "欢愉": "流派羁绊"
+      },
+      "version": "4.0",
+      "expert": false,
+      "registry": {
+        "name": "爻光",
+        "cost": 1,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "翡翠",
+      "wiki_name": "翡翠",
+      "wiki_page": "货币战争/翡翠",
+      "cost": 1,
+      "position": "后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "公司",
+        "群攻"
+      ],
+      "bond_kinds": {
+        "公司": "阵营羁绊",
+        "群攻": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "翡翠",
+        "cost": 1,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "艾丝妲",
+      "wiki_name": "艾丝妲",
+      "wiki_page": "货币战争/艾丝妲",
+      "cost": 1,
+      "position": "前台",
+      "tags": [
+        "辅助"
+      ],
+      "bonds": [
+        "持续伤害",
+        "银河学者"
+      ],
+      "bond_kinds": {
+        "持续伤害": "流派羁绊",
+        "银河学者": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "艾丝妲",
+        "cost": 1,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "藿藿",
+      "wiki_name": "藿藿",
+      "wiki_page": "货币战争/藿藿",
+      "cost": 1,
+      "position": "前后台",
+      "tags": [
+        "治疗",
+        "辅助"
+      ],
+      "bonds": [
+        "仙舟",
+        "治疗",
+        "能量"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "治疗": "流派羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "藿藿",
+        "cost": 2,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": [
+        "费用 注册表2 != wiki1"
+      ]
+    },
+    {
+      "name": "貊泽",
+      "wiki_name": "貊泽",
+      "wiki_page": "货币战争/貊泽",
+      "cost": 1,
+      "position": "后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "狼狩",
+        "追击"
+      ],
+      "bond_kinds": {
+        "狼狩": "阵营羁绊",
+        "追击": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "貊泽",
+        "cost": 1,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "赛飞儿",
+      "wiki_name": "赛飞儿",
+      "wiki_page": "货币战争/赛飞儿",
+      "cost": 1,
+      "position": "前台",
+      "tags": [
+        "辅助"
+      ],
+      "bonds": [
+        "减益",
+        "夜之半神",
+        "追击"
+      ],
+      "bond_kinds": {
+        "减益": "流派羁绊",
+        "夜之半神": "阵营羁绊",
+        "追击": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "赛飞儿",
+        "cost": 1,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "远坂凛",
+      "wiki_name": "远坂凛",
+      "wiki_page": "货币战争/远坂凛",
+      "cost": 1,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "命运圣杯",
+        "战技点"
+      ],
+      "bond_kinds": {
+        "命运圣杯": "阵营羁绊",
+        "战技点": "流派羁绊"
+      },
+      "version": "4.4",
+      "expert": false,
+      "registry": {
+        "name": "远坂凛",
+        "cost": 1,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "阿格莱雅",
+      "wiki_name": "阿格莱雅",
+      "wiki_page": "货币战争/阿格莱雅",
+      "cost": 1,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "昼之半神",
+        "能量"
+      ],
+      "bond_kinds": {
+        "昼之半神": "阵营羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "阿格莱雅",
+        "cost": 1,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "青雀",
+      "wiki_name": "青雀",
+      "wiki_page": "货币战争/青雀",
+      "cost": 1,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "仙舟",
+        "战技点"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "战技点": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "青雀",
+        "cost": 1,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "飞霄",
+      "wiki_name": "飞霄",
+      "wiki_page": "货币战争/飞霄",
+      "cost": 1,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "狼狩",
+        "追击"
+      ],
+      "bond_kinds": {
+        "狼狩": "阵营羁绊",
+        "追击": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "飞霄",
+        "cost": 1,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "黑塔",
+      "wiki_name": "黑塔",
+      "wiki_page": "货币战争/黑塔",
+      "cost": 1,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "群攻",
+        "银河学者"
+      ],
+      "bond_kinds": {
+        "群攻": "流派羁绊",
+        "银河学者": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "黑塔",
+        "cost": 1,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "不死途",
+      "wiki_name": "不死途",
+      "wiki_page": "货币战争/不死途",
+      "cost": 2,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "巡海游侠",
+        "追击"
+      ],
+      "bond_kinds": {
+        "巡海游侠": "阵营羁绊",
+        "追击": "流派羁绊"
+      },
+      "version": "4.2",
+      "expert": false,
+      "registry": {
+        "name": "不死途",
+        "cost": 2,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "丹恒·腾荒",
+      "wiki_name": "丹恒•腾荒",
+      "wiki_page": "货币战争/丹恒•腾荒",
+      "cost": 2,
+      "position": "后台",
+      "tags": [
+        "护盾"
+      ],
+      "bonds": [
+        "夜之半神",
+        "护盾"
+      ],
+      "bond_kinds": {
+        "夜之半神": "阵营羁绊",
+        "护盾": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "丹恒·腾荒",
+        "cost": 2,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "丹恒·饮月",
+      "wiki_name": "丹恒•饮月",
+      "wiki_page": "货币战争/丹恒•饮月",
+      "cost": 2,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "仙舟",
+        "列车同行",
+        "战技点"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "列车同行": "阵营羁绊",
+        "战技点": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "丹恒·饮月",
+        "cost": 2,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "佩拉",
+      "wiki_name": "佩拉",
+      "wiki_page": "货币战争/佩拉",
+      "cost": 2,
+      "position": "后台",
+      "tags": [
+        "辅助",
+        "输出"
+      ],
+      "bonds": [
+        "减益",
+        "贝洛伯格"
+      ],
+      "bond_kinds": {
+        "减益": "流派羁绊",
+        "贝洛伯格": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "佩拉",
+        "cost": 2,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "千冶·刃",
+      "wiki_name": "千冶•刃",
+      "wiki_page": "货币战争/千冶•刃",
+      "cost": 2,
+      "position": "后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "减益",
+        "星核猎手",
+        "燃血"
+      ],
+      "bond_kinds": {
+        "减益": "流派羁绊",
+        "星核猎手": "阵营羁绊",
+        "燃血": "流派羁绊"
+      },
+      "version": "4.4",
+      "expert": false,
+      "registry": {
+        "name": "千冶·刃",
+        "cost": 2,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "卡芙卡",
+      "wiki_name": "卡芙卡",
+      "wiki_page": "货币战争/卡芙卡",
+      "cost": 2,
+      "position": "前后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "持续伤害",
+        "星核猎手"
+      ],
+      "bond_kinds": {
+        "持续伤害": "流派羁绊",
+        "星核猎手": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "卡芙卡",
+        "cost": 2,
+        "positioning": "OnField"
+      },
+      "registry_diff": [
+        "站位 注册表OnField != wiki前后台"
+      ]
+    },
+    {
+      "name": "吉尔伽美什",
+      "wiki_name": "吉尔伽美什",
+      "wiki_page": "货币战争/吉尔伽美什",
+      "cost": 2,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "命运圣杯",
+        "能量"
+      ],
+      "bond_kinds": {
+        "命运圣杯": "阵营羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "4.4",
+      "expert": false,
+      "registry": {
+        "name": "吉尔伽美什",
+        "cost": 2,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "灵砂",
+      "wiki_name": "灵砂",
+      "wiki_page": "货币战争/灵砂",
+      "cost": 2,
+      "position": "前台",
+      "tags": [
+        "治疗",
+        "输出"
+      ],
+      "bonds": [
+        "击破",
+        "治疗",
+        "狼狩"
+      ],
+      "bond_kinds": {
+        "击破": "流派羁绊",
+        "治疗": "流派羁绊",
+        "狼狩": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "灵砂",
+        "cost": 2,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "砂金",
+      "wiki_name": "砂金",
+      "wiki_page": "货币战争/砂金",
+      "cost": 2,
+      "position": "前台",
+      "tags": [
+        "护盾",
+        "输出"
+      ],
+      "bonds": [
+        "公司",
+        "护盾",
+        "追击"
+      ],
+      "bond_kinds": {
+        "公司": "阵营羁绊",
+        "护盾": "流派羁绊",
+        "追击": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "砂金",
+        "cost": 2,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "绯英",
+      "wiki_name": "绯英",
+      "wiki_page": "货币战争/绯英",
+      "cost": 2,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "星间旅人",
+        "欢愉"
+      ],
+      "bond_kinds": {
+        "星间旅人": "阵营羁绊",
+        "欢愉": "流派羁绊"
+      },
+      "version": "4.2",
+      "expert": false,
+      "registry": {
+        "name": "绯英",
+        "cost": 2,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "缇宝",
+      "wiki_name": "缇宝",
+      "wiki_page": "货币战争/缇宝",
+      "cost": 2,
+      "position": "前后台",
+      "tags": [
+        "辅助",
+        "输出"
+      ],
+      "bonds": [
+        "昼之半神",
+        "群攻",
+        "量子同频"
+      ],
+      "bond_kinds": {
+        "昼之半神": "阵营羁绊",
+        "群攻": "流派羁绊",
+        "量子同频": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "缇宝",
+        "cost": 2,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "花火",
+      "wiki_name": "花火",
+      "wiki_page": "货币战争/花火",
+      "cost": 2,
+      "position": "后台",
+      "tags": [
+        "辅助"
+      ],
+      "bonds": [
+        "战技点",
+        "盛会之星",
+        "量子同频"
+      ],
+      "bond_kinds": {
+        "战技点": "流派羁绊",
+        "盛会之星": "阵营羁绊",
+        "量子同频": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "花火",
+        "cost": 2,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "银枝",
+      "wiki_name": "银枝",
+      "wiki_page": "货币战争/银枝",
+      "cost": 2,
+      "position": "前后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "星间旅人",
+        "群攻"
+      ],
+      "bond_kinds": {
+        "星间旅人": "阵营羁绊",
+        "群攻": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "银枝",
+        "cost": 2,
+        "positioning": "OnField"
+      },
+      "registry_diff": [
+        "站位 注册表OnField != wiki前后台"
+      ]
+    },
+    {
+      "name": "阮·梅",
+      "wiki_name": "阮•梅",
+      "wiki_page": "货币战争/阮•梅",
+      "cost": 2,
+      "position": "后台",
+      "tags": [
+        "辅助"
+      ],
+      "bonds": [
+        "击破",
+        "银河学者"
+      ],
+      "bond_kinds": {
+        "击破": "流派羁绊",
+        "银河学者": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "阮·梅",
+        "cost": 2,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "风堇",
+      "wiki_name": "风堇",
+      "wiki_page": "货币战争/风堇",
+      "cost": 2,
+      "position": "前台",
+      "tags": [
+        "治疗",
+        "输出"
+      ],
+      "bonds": [
+        "昼之半神",
+        "治疗",
+        "燃血"
+      ],
+      "bond_kinds": {
+        "昼之半神": "阵营羁绊",
+        "治疗": "流派羁绊",
+        "燃血": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "风堇",
+        "cost": 2,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "Saber",
+      "wiki_name": "Saber",
+      "wiki_page": "货币战争/Saber",
+      "cost": 3,
+      "position": "前后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "命运圣杯",
+        "能量"
+      ],
+      "bond_kinds": {
+        "命运圣杯": "阵营羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "Saber",
+        "cost": 3,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "刻律德菈",
+      "wiki_name": "刻律德菈",
+      "wiki_page": "货币战争/刻律德菈",
+      "cost": 3,
+      "position": "前后台",
+      "tags": [
+        "辅助"
+      ],
+      "bonds": [
+        "夜之半神",
+        "战技点"
+      ],
+      "bond_kinds": {
+        "夜之半神": "阵营羁绊",
+        "战技点": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "刻律德菈",
+        "cost": 3,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "姬子",
+      "wiki_name": "姬子",
+      "wiki_page": "货币战争/姬子",
+      "cost": 3,
+      "position": "后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "击破",
+        "列车同行"
+      ],
+      "bond_kinds": {
+        "击破": "流派羁绊",
+        "列车同行": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "姬子",
+        "cost": 3,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "姬子·启行",
+      "wiki_name": "姬子•启行",
+      "wiki_page": "货币战争/姬子•启行",
+      "cost": 3,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "列车同行",
+        "领航员"
+      ],
+      "bond_kinds": {
+        "列车同行": "阵营羁绊",
+        "领航员": "独立羁绊"
+      },
+      "version": "4.4",
+      "expert": false,
+      "registry": {
+        "name": "姬子·启行",
+        "cost": 3,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "娜塔莎",
+      "wiki_name": "娜塔莎",
+      "wiki_page": "货币战争/娜塔莎",
+      "cost": 3,
+      "position": "前后台",
+      "tags": [
+        "治疗"
+      ],
+      "bonds": [
+        "治疗",
+        "贝洛伯格"
+      ],
+      "bond_kinds": {
+        "治疗": "流派羁绊",
+        "贝洛伯格": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "娜塔莎",
+        "cost": 3,
+        "positioning": "OffField"
+      },
+      "registry_diff": [
+        "站位 注册表OffField != wiki前后台"
+      ]
+    },
+    {
+      "name": "希儿",
+      "wiki_name": "希儿",
+      "wiki_page": "货币战争/希儿",
+      "cost": 3,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "贝洛伯格",
+        "量子同频"
+      ],
+      "bond_kinds": {
+        "贝洛伯格": "阵营羁绊",
+        "量子同频": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "希儿",
+        "cost": 3,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "忘归人",
+      "wiki_name": "忘归人",
+      "wiki_page": "货币战争/忘归人",
+      "cost": 3,
+      "position": "后台",
+      "tags": [
+        "辅助",
+        "输出"
+      ],
+      "bonds": [
+        "仙舟",
+        "击破"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "击破": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "忘归人",
+        "cost": 3,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "星期日",
+      "wiki_name": "星期日",
+      "wiki_page": "货币战争/星期日",
+      "cost": 3,
+      "position": "前后台",
+      "tags": [
+        "辅助"
+      ],
+      "bonds": [
+        "列车同行",
+        "盛会之星",
+        "能量"
+      ],
+      "bond_kinds": {
+        "列车同行": "阵营羁绊",
+        "盛会之星": "阵营羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "星期日",
+        "cost": 3,
+        "positioning": "OnField"
+      },
+      "registry_diff": [
+        "站位 注册表OnField != wiki前后台"
+      ]
+    },
+    {
+      "name": "白厄",
+      "wiki_name": "白厄",
+      "wiki_page": "货币战争/白厄",
+      "cost": 3,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "救世主"
+      ],
+      "bond_kinds": {
+        "救世主": "独立羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "白厄",
+        "cost": 3,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "真理医生",
+      "wiki_name": "真理医生",
+      "wiki_page": "货币战争/真理医生",
+      "cost": 3,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "星间旅人",
+        "追击",
+        "银河学者"
+      ],
+      "bond_kinds": {
+        "星间旅人": "阵营羁绊",
+        "追击": "流派羁绊",
+        "银河学者": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "真理医生",
+        "cost": 3,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "那刻夏",
+      "wiki_name": "那刻夏",
+      "wiki_page": "货币战争/那刻夏",
+      "cost": 3,
+      "position": "后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "昼之半神",
+        "群攻"
+      ],
+      "bond_kinds": {
+        "昼之半神": "阵营羁绊",
+        "群攻": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "那刻夏",
+        "cost": 3,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "银狼LV.999",
+      "wiki_name": "银狼LV.999",
+      "wiki_page": "货币战争/银狼LV.999",
+      "cost": 3,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "头号玩家",
+        "星核猎手",
+        "欢愉"
+      ],
+      "bond_kinds": {
+        "头号玩家": "独立羁绊",
+        "星核猎手": "阵营羁绊",
+        "欢愉": "流派羁绊"
+      },
+      "version": "4.2",
+      "expert": false,
+      "registry": {
+        "name": "银狼LV.999",
+        "cost": 5,
+        "positioning": "OnOffField"
+      },
+      "costs": [
+        3,
+        4,
+        5
+      ],
+      "registry_diff": [
+        "站位 注册表OnOffField != wiki前台"
+      ]
+    },
+    {
+      "name": "镜流",
+      "wiki_name": "镜流",
+      "wiki_page": "货币战争/镜流",
+      "cost": 3,
+      "position": "后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "燃血",
+        "狼狩"
+      ],
+      "bond_kinds": {
+        "燃血": "流派羁绊",
+        "狼狩": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "镜流",
+        "cost": 3,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "黄泉",
+      "wiki_name": "黄泉",
+      "wiki_page": "货币战争/黄泉",
+      "cost": 3,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "减益",
+        "巡海游侠"
+      ],
+      "bond_kinds": {
+        "减益": "流派羁绊",
+        "巡海游侠": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "黄泉",
+        "cost": 3,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "大黑塔",
+      "wiki_name": "大黑塔",
+      "wiki_page": "货币战争/大黑塔",
+      "cost": 4,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "群攻",
+        "银河学者"
+      ],
+      "bond_kinds": {
+        "群攻": "流派羁绊",
+        "银河学者": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "大黑塔",
+        "cost": 4,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "开拓者•欢愉",
+      "wiki_name": "开拓者•欢愉",
+      "wiki_page": "货币战争/开拓者•欢愉",
+      "cost": 4,
+      "position": "后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "列车同行",
+        "欢愉",
+        "能量"
+      ],
+      "bond_kinds": {
+        "列车同行": "阵营羁绊",
+        "欢愉": "流派羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "4.2",
+      "expert": false,
+      "registry": null
+    },
+    {
+      "name": "开拓者•记忆",
+      "wiki_name": "开拓者•记忆",
+      "wiki_page": "货币战争/开拓者•记忆",
+      "cost": 4,
+      "position": "前台",
+      "tags": [
+        "辅助",
+        "输出"
+      ],
+      "bonds": [
+        "列车同行",
+        "能量"
+      ],
+      "bond_kinds": {
+        "列车同行": "阵营羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": null
+    },
+    {
+      "name": "彦卿",
+      "wiki_name": "彦卿",
+      "wiki_page": "货币战争/彦卿",
+      "cost": 4,
+      "position": "后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "仙舟",
+        "减益",
+        "狼狩"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "减益": "流派羁绊",
+        "狼狩": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "彦卿",
+        "cost": 3,
+        "positioning": "OffField"
+      },
+      "registry_diff": [
+        "费用 注册表3 != wiki4"
+      ]
+    },
+    {
+      "name": "杰帕德",
+      "wiki_name": "杰帕德",
+      "wiki_page": "货币战争/杰帕德",
+      "cost": 4,
+      "position": "前台",
+      "tags": [
+        "护盾",
+        "输出"
+      ],
+      "bonds": [
+        "护盾",
+        "贝洛伯格"
+      ],
+      "bond_kinds": {
+        "护盾": "流派羁绊",
+        "贝洛伯格": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "杰帕德",
+        "cost": 4,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "波提欧",
+      "wiki_name": "波提欧",
+      "wiki_page": "货币战争/波提欧",
+      "cost": 4,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "击破",
+        "巡海游侠"
+      ],
+      "bond_kinds": {
+        "击破": "流派羁绊",
+        "巡海游侠": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "波提欧",
+        "cost": 4,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "海瑟音",
+      "wiki_name": "海瑟音",
+      "wiki_page": "货币战争/海瑟音",
+      "cost": 4,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "持续伤害",
+        "昼之半神"
+      ],
+      "bond_kinds": {
+        "持续伤害": "流派羁绊",
+        "昼之半神": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "海瑟音",
+        "cost": 4,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "火花",
+      "wiki_name": "火花",
+      "wiki_page": "货币战争/火花",
+      "cost": 4,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "战技点",
+        "星间旅人",
+        "欢愉"
+      ],
+      "bond_kinds": {
+        "战技点": "流派羁绊",
+        "星间旅人": "阵营羁绊",
+        "欢愉": "流派羁绊"
+      },
+      "version": "4.0",
+      "expert": false,
+      "registry": {
+        "name": "火花",
+        "cost": 4,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "知更鸟",
+      "wiki_name": "知更鸟",
+      "wiki_page": "货币战争/知更鸟",
+      "cost": 4,
+      "position": "后台",
+      "tags": [
+        "辅助",
+        "输出"
+      ],
+      "bonds": [
+        "盛会之星",
+        "追击"
+      ],
+      "bond_kinds": {
+        "盛会之星": "阵营羁绊",
+        "追击": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "知更鸟",
+        "cost": 4,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "符玄",
+      "wiki_name": "符玄",
+      "wiki_page": "货币战争/符玄",
+      "cost": 4,
+      "position": "后台",
+      "tags": [
+        "治疗",
+        "辅助"
+      ],
+      "bonds": [
+        "仙舟",
+        "治疗",
+        "量子同频"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "治疗": "流派羁绊",
+        "量子同频": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "符玄",
+        "cost": 4,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "罗刹",
+      "wiki_name": "罗刹",
+      "wiki_page": "货币战争/罗刹",
+      "cost": 4,
+      "position": "后台",
+      "tags": [
+        "治疗",
+        "辅助"
+      ],
+      "bonds": [
+        "星间旅人",
+        "治疗"
+      ],
+      "bond_kinds": {
+        "星间旅人": "阵营羁绊",
+        "治疗": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "罗刹",
+        "cost": 4,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "遐蝶",
+      "wiki_name": "遐蝶",
+      "wiki_page": "货币战争/遐蝶",
+      "cost": 4,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "夜之半神",
+        "燃血"
+      ],
+      "bond_kinds": {
+        "夜之半神": "阵营羁绊",
+        "燃血": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "遐蝶",
+        "cost": 4,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "银狼",
+      "wiki_name": "银狼",
+      "wiki_page": "货币战争/银狼",
+      "cost": 4,
+      "position": "前后台",
+      "tags": [
+        "辅助",
+        "输出"
+      ],
+      "bonds": [
+        "星核猎手",
+        "量子同频"
+      ],
+      "bond_kinds": {
+        "星核猎手": "阵营羁绊",
+        "量子同频": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": true,
+      "registry": {
+        "name": "银狼",
+        "cost": 4,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "长夜月",
+      "wiki_name": "长夜月",
+      "wiki_page": "货币战争/长夜月",
+      "cost": 4,
+      "position": "前后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "夜之半神",
+        "燃血"
+      ],
+      "bond_kinds": {
+        "夜之半神": "阵营羁绊",
+        "燃血": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "长夜月",
+        "cost": 4,
+        "positioning": "OnOffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "Archer",
+      "wiki_name": "Archer",
+      "wiki_page": "货币战争/Archer",
+      "cost": 5,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "命运圣杯",
+        "战技点",
+        "魔术师"
+      ],
+      "bond_kinds": {
+        "命运圣杯": "阵营羁绊",
+        "战技点": "流派羁绊",
+        "魔术师": "独立羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "Archer",
+        "cost": 5,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "云璃",
+      "wiki_name": "云璃",
+      "wiki_page": "货币战争/云璃",
+      "cost": 5,
+      "position": "后台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "狼狩",
+        "能量"
+      ],
+      "bond_kinds": {
+        "狼狩": "阵营羁绊",
+        "能量": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "云璃",
+        "cost": 5,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "布洛妮娅",
+      "wiki_name": "布洛妮娅",
+      "wiki_page": "货币战争/布洛妮娅",
+      "cost": 5,
+      "position": "前台",
+      "tags": [
+        "辅助",
+        "输出"
+      ],
+      "bonds": [
+        "大守护者",
+        "燃血",
+        "贝洛伯格"
+      ],
+      "bond_kinds": {
+        "大守护者": "独立羁绊",
+        "燃血": "流派羁绊",
+        "贝洛伯格": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "布洛妮娅",
+        "cost": 5,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "托帕&账账",
+      "wiki_name": "托帕&账账",
+      "wiki_page": "货币战争/托帕&账账",
+      "cost": 5,
+      "position": "后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "公司",
+        "追击"
+      ],
+      "bond_kinds": {
+        "公司": "阵营羁绊",
+        "追击": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "托帕&账账",
+        "cost": 5,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "昔涟",
+      "wiki_name": "昔涟",
+      "wiki_page": "货币战争/昔涟",
+      "cost": 5,
+      "position": "前台",
+      "tags": [
+        "辅助",
+        "输出"
+      ],
+      "bonds": [
+        "夜之半神",
+        "挚爱之人",
+        "昼之半神"
+      ],
+      "bond_kinds": {
+        "夜之半神": "阵营羁绊",
+        "挚爱之人": "独立羁绊",
+        "昼之半神": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "昔涟",
+        "cost": 5,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "景元",
+      "wiki_name": "景元",
+      "wiki_page": "货币战争/景元",
+      "cost": 5,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "仙舟",
+        "群攻"
+      ],
+      "bond_kinds": {
+        "仙舟": "阵营羁绊",
+        "群攻": "流派羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "景元",
+        "cost": 5,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "流萤",
+      "wiki_name": "流萤",
+      "wiki_page": "货币战争/流萤",
+      "cost": 5,
+      "position": "前台",
+      "tags": [
+        "输出"
+      ],
+      "bonds": [
+        "击破",
+        "星核猎手"
+      ],
+      "bond_kinds": {
+        "击破": "流派羁绊",
+        "星核猎手": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "流萤",
+        "cost": 5,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "瓦尔特",
+      "wiki_name": "瓦尔特",
+      "wiki_page": "货币战争/瓦尔特",
+      "cost": 5,
+      "position": "前台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "减益",
+        "列车同行",
+        "星间旅人"
+      ],
+      "bond_kinds": {
+        "减益": "流派羁绊",
+        "列车同行": "阵营羁绊",
+        "星间旅人": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "瓦尔特",
+        "cost": 5,
+        "positioning": "OnField"
+      },
+      "registry_diff": []
+    },
+    {
+      "name": "黑天鹅",
+      "wiki_name": "黑天鹅",
+      "wiki_page": "货币战争/黑天鹅",
+      "cost": 5,
+      "position": "后台",
+      "tags": [
+        "输出",
+        "辅助"
+      ],
+      "bonds": [
+        "命运卜者",
+        "持续伤害",
+        "盛会之星"
+      ],
+      "bond_kinds": {
+        "命运卜者": "独立羁绊",
+        "持续伤害": "流派羁绊",
+        "盛会之星": "阵营羁绊"
+      },
+      "version": "3.7",
+      "expert": false,
+      "registry": {
+        "name": "黑天鹅",
+        "cost": 5,
+        "positioning": "OffField"
+      },
+      "registry_diff": []
+    }
+  ]
+}
