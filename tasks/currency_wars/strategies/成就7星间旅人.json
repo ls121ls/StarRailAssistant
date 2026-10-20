@@ -7,6 +7,8 @@
   "min_coins": 40,
   "min_level": 8,
   "mid_level": 9,
+  "recommend_environments": ["星间旅人概念股", "星间旅人邀请", "联席决策", "?白银时代"],
+  "recommend_invest_strategies": "星间旅人星徽套组;淘金客;及时雨",
   "on_field": {
     "火花": 3,
     "真理医生": 2,

@@ -64,6 +64,7 @@ public partial class TaskPageViewModel : PageViewModel
         nameof(SelectedGardenOfPlentyLevels2Index),
         nameof(SelectedPlanarFissureLevelsIndex),
         nameof(SelectedRealmOfTheStrangeLevelsIndex),
+        nameof(SelectedStrategyInvestHint),
         nameof(AccountText))]
     private partial TasksConfig CurrentConfig { get; set; }
 
@@ -170,7 +171,24 @@ public partial class TaskPageViewModel : PageViewModel
         {
             CosmicStrifeConfig.CurrencyWarsStrategyIndex = value;
             OnPropertyChanged();
-            CosmicStrifeConfig.CurrencyWarsStrategy = Cache.Strategies.ElementAtOrDefault(value)?.FileName ?? "";
+            var strategy = Cache.Strategies.ElementAtOrDefault(value);
+            CosmicStrifeConfig.CurrencyWarsStrategy = strategy?.FileName ?? "";
+            // 选择攻略时自动带入其推荐投资环境（多个候选以空格分隔，? 前缀表示可选）
+            if (strategy is { RecommendEnvironments.Count: > 0 })
+                CosmicStrifeConfig.CurrencyWarsRerollInvestEnvironments =
+                    string.Join(" ", strategy.RecommendEnvironments);
+            OnPropertyChanged(nameof(SelectedStrategyInvestHint));
+        }
+    }
+
+    /// <summary>当前所选攻略推荐的按阶段投资策略，供刷开局时参照填写</summary>
+    public string SelectedStrategyInvestHint
+    {
+        get
+        {
+            var recommend = Cache.Strategies
+                .ElementAtOrDefault(CosmicStrifeConfig.CurrencyWarsStrategyIndex)?.RecommendInvestStrategies;
+            return string.IsNullOrWhiteSpace(recommend) ? "" : $"推荐：{recommend}";
         }
     }
 

@@ -43,10 +43,18 @@ class RerollStart(CurrencyWars):
         self.hate_boss_affixes: list[strutil.StrMatcher] | None = None  # 讨厌的boss词缀，出现就重开
         self.invest_strategy_stage = 0  # 投资策略阶段
         self.invest_strategy_satisfied = False  # 满意标志
+        self.opening_satisfied = False  # 是否已刷到理想开局（此后转为按攻略打完整局）
 
     def handle_ending(self):
-        # 刷开局不需要结束游戏
-        pass
+        # 未刷到理想开局时保持现状：不结算也不退出，把局面留给人工接手
+        if not self.opening_satisfied:
+            return
+        # 已按攻略打完整局，回到开始页面后正常收尾
+        super().handle_ending()
+
+    def should_continue_next_round(self) -> bool:
+        # 刷到理想开局并打完后，本局即为目标对局，不再重开下一局
+        return not self.opening_satisfied
 
     @staticmethod
     @deprecated("此方法已过时，请使用 strutil.normalize_ocr_text 方法")
@@ -80,7 +88,7 @@ class RerollStart(CurrencyWars):
         例如：
         - "策略1;策略2"：阶段1需要策略1，阶段2需要策略2
         - ";策略2"：阶段1无要求，阶段2需要策略2
-        - "策略1;"：阶段1需要策略1，阶段2无要求，阶段1满足后立即结束
+        - "策略1;"：阶段1需要策略1，满足后即达成理想开局，按攻略打完整局
         """
         if not invest_strategy:
             return
@@ -161,17 +169,29 @@ class RerollStart(CurrencyWars):
             self.abort_and_return()
             self.reroll = False
             return False
-        if not self.wanted_invest_strategies:
-            # 如果不需要重开，且没有投资策略要求，可中止刷开局
-            logger.info("已刷到满足要求的开局，停止刷开局")
-            self.is_running = False
-            return False
-        # 检查当前阶段是否有投资策略要求，无要求则立即结束
-        if self.invest_strategy_stage >= len(self.wanted_invest_strategies):
-            logger.info("所有阶段投资策略已满足，停止刷开局")
-            self.is_running = False
-            return False
+        if self.opening_satisfied:
+            return True
+        # 没有投资策略要求，或所有阶段要求均已满足：本次开局即为理想开局，转为按攻略继续对局
+        if not self.wanted_invest_strategies or self.invest_strategy_stage >= len(self.wanted_invest_strategies):
+            logger.info("已刷到满足要求的开局，转为按攻略继续对局...")
+            self._mark_opening_satisfied()
         return True
+
+    def _mark_opening_satisfied(self) -> None:
+        """标记理想开局已达成：保留任务运行状态，交给游戏循环按攻略打完整局"""
+        self.opening_satisfied = True
+        # 后续不再需要识别投资策略阶段
+        self.wanted_invest_strategies = None
+
+    def _continue_with_default_strategy(self, prev_stage: StageName | None, reason: str) -> bool:
+        """理想开局已达成：当前弹出的投资策略交给基础逻辑选择，然后继续对局
+
+        :return: False-非终止状态，关卡阶段流程会继续等待下一个界面
+        """
+        logger.info(f"{reason}，转为按攻略继续对局...")
+        self._mark_opening_satisfied()
+        super().handle_invest_strategy(prev_stage=prev_stage)
+        return False
 
     def handle_invest_strategy(self, prev_stage: StageName | None) -> bool:
         def default_invest_strategy_handler():
@@ -181,6 +201,11 @@ class RerollStart(CurrencyWars):
             self.abort_and_return()
             self.invest_strategy_stage = 0
 
+        # 已刷到理想开局：后续弹出的投资策略交给基础逻辑，继续打完整局
+        if self.opening_satisfied:
+            super().handle_invest_strategy(prev_stage=prev_stage)
+            return False
+
         # 检测是否为同一阶段的re-trigger（游戏连续两次弹出投资策略选择界面）
         # prev_stage == StageName.SELECT_INVEST_STRATEGY 表示上一个阶段也是投资策略选择，即re-trigger
         if prev_stage == StageName.SELECT_INVEST_STRATEGY and self.wanted_invest_strategies:
@@ -189,31 +214,26 @@ class RerollStart(CurrencyWars):
                 current_stage_index = retrigger_index
                 logger.info(f"检测到投资策略re-trigger，阶段{current_stage_index + 1}未变更，不推进阶段")
             else:
-                # re-trigger 但索引越界，说明已无更多阶段，直接结束
-                logger.info(f"阶段{self.invest_strategy_stage}已无更多投资策略要求，停止刷开局")
-                self.is_running = False
-                return True
+                # re-trigger 但索引越界，说明已无更多阶段要求
+                return self._continue_with_default_strategy(prev_stage, f"阶段{self.invest_strategy_stage}已无更多投资策略要求")
         else:
             current_stage_index = self.invest_strategy_stage
             self.invest_strategy_stage += 1
 
         # 检查当前阶段是否有投资策略要求
         if not self.wanted_invest_strategies or current_stage_index >= len(self.wanted_invest_strategies):
-            # 没有更多要求，直接结束刷开局
-            logger.info(f"阶段{self.invest_strategy_stage}无投资策略要求，所有阶段已满足，停止刷开局")
-            self.is_running = False
-            return True
+            # 没有更多要求
+            return self._continue_with_default_strategy(prev_stage, f"阶段{self.invest_strategy_stage}无投资策略要求，所有阶段已满足")
         
         wanted_strategy = self.wanted_invest_strategies[current_stage_index]
         if not wanted_strategy:
             # 当前阶段无要求，直接继续下一阶段
             logger.info(f"阶段{self.invest_strategy_stage}无投资策略要求，继续游戏...")
             super().handle_invest_strategy(prev_stage=prev_stage)
-            # 检查下一阶段是否还有要求，若无则结束
+            # 已是最后一个阶段：理想开局达成，交给游戏循环继续对局
             if current_stage_index + 1 >= len(self.wanted_invest_strategies):
-                logger.info("所有阶段投资策略已满足，停止刷开局")
-                self.is_running = False
-                return True
+                logger.info("所有阶段投资策略已满足，转为按攻略继续对局...")
+                self._mark_opening_satisfied()
             return False
 
         for _ in range(3):
@@ -231,10 +251,10 @@ class RerollStart(CurrencyWars):
                 logger.info("投资策略符合要求，继续游戏...")
                 self.operator.click_box(result)
                 self.operator.click_img(IMG.ENSURE2, after_sleep=1)
-                # 检查下一阶段是否还有要求，若无则结束
+                # 已是最后一个阶段：理想开局达成，交给游戏循环继续对局
                 if current_stage_index + 1 >= len(self.wanted_invest_strategies):
-                    logger.info("当前阶段满足且无后续要求，停止刷开局")
-                    self.is_running = False
+                    logger.info("当前阶段满足且无后续要求，转为按攻略继续对局...")
+                    self._mark_opening_satisfied()
                 return True
 
         default_invest_strategy_handler()

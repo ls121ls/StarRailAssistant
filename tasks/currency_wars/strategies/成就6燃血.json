@@ -7,6 +7,8 @@
   "min_coins": 40,
   "min_level": 7,
   "mid_level": 9,
+  "recommend_environments": ["燃血概念股", "联席决策", "?白银时代"],
+  "recommend_invest_strategies": "燃血星徽套组;复印件;及时雨",
   "on_field": {
     "遐蝶": 3,
     "长夜月": 2,

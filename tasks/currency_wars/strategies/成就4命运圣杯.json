@@ -7,6 +7,8 @@
   "min_coins": 40,
   "min_level": 7,
   "mid_level": 9,
+  "recommend_environments": ["命运圣杯契约", "能量概念股", "联席决策", "?白银时代"],
+  "recommend_invest_strategies": "都是这家伙的错！;概率事件;复印件",
   "on_field": {
     "Archer": 2,
     "风堇": 2,

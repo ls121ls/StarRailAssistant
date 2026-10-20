@@ -118,10 +118,17 @@ class CurrencyWars(Executable):
             try:
                 if self.start_game():
                     self.game_loop()
+                    if not self.should_continue_next_round():
+                        break
             except Exception as e:
                 logger.error(e)
                 return False
         self.handle_ending()
+        return True
+
+    def should_continue_next_round(self) -> bool:
+        """ 一局结束后是否继续进入下一局。默认继续，子类可重写
+        （如刷开局在达成理想开局并打完后不再重开）。 """
         return True
 
     def handle_ending(self):

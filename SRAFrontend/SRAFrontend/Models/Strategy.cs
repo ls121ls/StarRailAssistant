@@ -23,4 +23,8 @@ public class Strategy
     public Dictionary<string, int> OnField { get; set; } = new();
     [JsonPropertyName("off_field")]
     public Dictionary<string, int> OffField { get; set; } = new();
+    [JsonPropertyName("recommend_environments")]
+    public List<string> RecommendEnvironments { get; set; } = new();
+    [JsonPropertyName("recommend_invest_strategies")]
+    public string RecommendInvestStrategies { get; set; } = "";
 }
