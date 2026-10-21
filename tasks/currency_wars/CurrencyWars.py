@@ -30,6 +30,8 @@ class CurrencyWarsPage(enum.IntEnum):
 # 当前对局节点数：位面1 共9个（1-9首领），位面2/3 各7个（2-7/3-7首领）。
 # 装备只在每个位面的第4个节点和最后一个节点处理，其余节点不打开装备面板。
 EQUIPMENT_ROUNDS = frozenset({(1, 4), (1, 9), (2, 4), (2, 7), (3, 4), (3, 7)})
+# 每个角色最多穿戴3件装备
+MAX_EQUIPMENT_PER_CHARACTER = 3
 
 
 class StageName(enum.StrEnum):
@@ -158,16 +160,19 @@ class CurrencyWars(Executable):
             if c is not None:
                 c.is_placed = False  # 重置放置状态
                 c.stars = 1  # 重置星级
+                c.equip_count = 0  # 重置装备计数
             self.on_field_character[i] = None  # 重置角色信息
         for i, c in enumerate(self.off_field_character):
             if c is not None:
                 c.is_placed = False
                 c.stars = 1
+                c.equip_count = 0
             self.off_field_character[i] = None
         for i, c in enumerate(self.in_hand_character):
             if c is not None:
                 c.is_placed = False
                 c.stars = 1
+                c.equip_count = 0
             self.in_hand_character[i] = None
 
     def set_difficulty(self, mode: int):
@@ -426,6 +431,9 @@ class CurrencyWars(Executable):
         :return: True-初始化成功，False-初始化失败
         """
         self.operator.sleep(1)
+        # 新对局重新统计每个角色的装备件数
+        for character in Characters.characters.values():
+            character.equip_count = 0
         if self.is_continue:
             # 继续进度：获取前台角色信息
             logger.info("[初始化] 继续进度")
@@ -551,30 +559,133 @@ class CurrencyWars(Executable):
         return None
 
     def refresh_character(self, equip: bool = True):
-        """ 刷新角色信息，确保备战席中未放置的角色状态正确。 """
-        self.get_on_field_area(True, equip=equip)
+        """ 刷新角色信息，确保备战席中未放置的角色状态正确。
+
+        完整扫描会依次点击槽位识别身份；需要装备时，扫描完成后只按缓存
+        给可装备的出场角色穿戴/合成，不再为装备重扫一遍所有槽位。
+        """
+        self.get_on_field_area(True)
         self.operator.sleep(0.3)
-        boxes = self.operator.rectangle_detect(120, 150, 130, 150,
-                                               from_x=0.1, from_y=0.52, to_x=0.86, to_y=0.7,
-                                               trace=False)
-        if boxes:
-            sorted_boxes = sorted(boxes, key=lambda b: b.left)
-            self.off_field_area = [
-                (b.center[0] / self.operator.window_context.width, b.center[1] / self.operator.window_context.height)
-                for b in sorted_boxes
-            ]
-            # 同步调整角色列表长度
-            if len(self.off_field_area) > len(self.off_field_character):
-                self.off_field_character.extend(
-                    [None] * (len(self.off_field_area) - len(self.off_field_character))
-                )
-            logger.info(f"当前后台共有 {len(self.off_field_area)} 个位置")
-        self.get_off_field_area(True, equip=equip)
+        self._sync_off_field_area()
+        self.get_off_field_area(True)
         self.operator.sleep(0.3)
+        if equip:
+            self.equip_cached_characters(sync_layout=False)
         field_characters = self.on_field_character + self.off_field_character
         for c in self.in_hand_character:
             if c is not None and c not in field_characters:
                 c.is_placed = False
+
+    def _sync_off_field_area(self):
+        """只识别后台槽位坐标，不点击任何槽位。"""
+        boxes = self.operator.rectangle_detect(120, 150, 130, 150,
+                                               from_x=0.1, from_y=0.52, to_x=0.86, to_y=0.7,
+                                               trace=False)
+        if not boxes:
+            return
+        sorted_boxes = sorted(boxes, key=lambda b: b.left)
+        self.off_field_area = [
+            (b.center[0] / self.operator.window_context.width, b.center[1] / self.operator.window_context.height)
+            for b in sorted_boxes
+        ]
+        # 同步调整角色列表长度
+        if len(self.off_field_area) > len(self.off_field_character):
+            self.off_field_character.extend(
+                [None] * (len(self.off_field_area) - len(self.off_field_character))
+            )
+        logger.info(f"当前后台共有 {len(self.off_field_area)} 个位置")
+
+    def equip_cached_characters(self, *, sync_layout: bool = True) -> int:
+        """按缓存的出场角色穿戴/合成装备。
+
+        只点击缓存中已确认身份、属于攻略且仍可装备的角色位置，按攻略优先级
+        排序后逐个处理；不依次点击所有槽位，也不点击空位。
+        """
+        if sync_layout:
+            self._sync_off_field_area()
+        targets: list[tuple[str, int, Character, tuple[float, float]]] = []
+        for area_name, characters, areas in (
+                ("前台", self.on_field_character, self.on_field_area),
+                ("后台", self.off_field_character, self.off_field_area),
+        ):
+            for index, character in enumerate(characters):
+                if index >= len(areas):
+                    break
+                if self._can_equip(character):
+                    targets.append((area_name, index, character, areas[index]))
+        # 攻略优先级高的角色先穿，避免低优先级角色占用装备
+        targets.sort(key=lambda item: item[2].priority if item[2].priority is not None else -1,
+                     reverse=True)
+        logger.info(f"装备轮：缓存中可装备角色 {len(targets)} 个："
+                    f"{'、'.join(c.name for _, _, c, _ in targets) or '无'}")
+        equipped = 0
+        for area_name, index, character, point in targets:
+            if self._equip_cached_character(area_name, index, character, point):
+                equipped += 1
+            self.operator.sleep(0.3)
+        logger.info(f"装备轮完成：成功穿戴/合成 {equipped} 件")
+        return equipped
+
+    def _can_equip(self, character: Character | None) -> bool:
+        """缓存中的角色是否还需要并且允许穿戴装备。"""
+        if character is None or character.is_npc or character.is_locked:
+            return False
+        if character.name not in self.strategy_characters:
+            return False  # 不给不在攻略中的角色穿戴装备
+        return character.equip_count < MAX_EQUIPMENT_PER_CHARACTER
+
+    def _equip_cached_character(self, area_name: str, index: int,
+                                character: Character, point: tuple[float, float]) -> bool:
+        """点击缓存角色所在槽位，核实面板身份后执行一次穿戴/合成。"""
+        self.operator.click_point(*point, after_sleep=0.5, trace=False)
+        try:
+            recommend = self.operator.locate(CWIMG.EQUIPMENT_RECOMMEND)
+            if not recommend:
+                # 面板可能尚未弹出，短暂重试后再判定缓存失效
+                self.operator.sleep(0.4)
+                recommend = self.operator.locate(CWIMG.EQUIPMENT_RECOMMEND)
+            if not recommend:
+                # 槽位已不是缓存中的角色或已为空，交给下次完整扫描校正
+                logger.info(f"{area_name}[{index}] 未打开 {character.name} 的角色面板，缓存已过期，跳过装备")
+                self._set_cached_character(area_name, index, None)
+                return False
+            panel_character = self._read_panel_character()
+            if panel_character is not None and panel_character.name != character.name:
+                logger.warning(f"{area_name}[{index}] 缓存角色 {character.name} 与实际 "
+                               f"{panel_character.name} 不符，跳过装备并更新缓存")
+                self._set_cached_character(area_name, index, panel_character)
+                return False
+            self.operator.click_box(recommend, after_sleep=1)
+            _, box = self.operator.locate_any([CWIMG.EQUIP, CWIMG.SYNTHESIS], confidence=0.8)
+            if not box:
+                logger.info(f"{area_name}[{index}] {character.name} 暂无可穿戴或可合成装备")
+                return False
+            if not self.operator.click_box(box, after_sleep=0.5):
+                logger.warning(f"{area_name}[{index}] {character.name} 穿戴/合成点击失败")
+                return False
+            character.equip_count += 1
+            logger.info(f"{area_name}[{index}] {character.name} 已穿戴/合成 1 件装备"
+                        f"（{character.equip_count}/{MAX_EQUIPMENT_PER_CHARACTER}）")
+            return True
+        finally:
+            self.operator.click_point(0.5, 0.5, trace=False)  # 关闭角色面板
+
+    def _read_panel_character(self) -> Character | None:
+        """读取当前角色面板中的角色，只用于复核缓存身份。"""
+        rows = self.operator.ocr(from_x=0.775, from_y=0.175, to_x=0.880, to_y=0.2315)
+        if not rows:
+            # 狸猫/佩佩等角色名称可能显示在另一个位置
+            rows = self.operator.ocr(from_x=0.775, from_y=0.445, to_x=0.880, to_y=0.486)
+        if not rows:
+            return None
+        name = "".join(str(row[1]) for row in rows)
+        return Characters.get_character(name)
+
+    def _set_cached_character(self, area_name: str, index: int, character: Character | None):
+        """更新前后台缓存中的槽位内容，供后续装备判断和扫描使用。"""
+        target = self.on_field_character if area_name == "前台" else self.off_field_character
+        if 0 <= index < len(target):
+            target[index] = character
 
     def get_coins(self):
         # 实现获取金币逻辑
@@ -592,7 +703,6 @@ class CurrencyWars(Executable):
                                areas,
                                target_character_list,
                                force=False,
-                               equip=False,
                                count_stars=False,
                                use_backup_ocr=False):
         """
@@ -600,7 +710,6 @@ class CurrencyWars(Executable):
         :param areas: 区域坐标列表（如 off_field_area）
         :param target_character_list: 目标角色列表（如 off_field_character，将被更新）
         :param force: 强制更新角色信息，默认False（即已有角色则跳过）
-        :param equip: 是否顺便穿戴装备
         :param count_stars: 是否获取角色星级
         :return: 更新后的角色列表
         """
@@ -658,17 +767,11 @@ class CurrencyWars(Executable):
                     if char is None:
                         logger.warning(f"OCR识别到角色名称：{name}，但未在角色列表中找到匹配项")
                         target_character_list[index] = Characters.new_character(name)  # 新增临时角色
+                        self.operator.click_point(0.5, 0.5, trace=False)  # 关闭信息框，避免影响下一个槽位
                         continue
                     if count_stars and not char.is_npc:
                         char.stars = get_stars(merge=3)
                     target_character_list[index] = char
-                    if equip and not char.is_npc:
-                        if char.name not in self.strategy_characters.keys():
-                            continue  # 不给不在攻略中的角色穿戴装备
-                        self.operator.click_img(CWIMG.EQUIPMENT_RECOMMEND, after_sleep=1)
-                        _, box = self.operator.locate_any([CWIMG.EQUIP, CWIMG.SYNTHESIS], confidence=0.8)
-                        if box:
-                            self.operator.click_box(box, after_sleep=0.5)
                     self.operator.click_point(0.5, 0.5, trace=False)  # 点击空白处关闭信息框
                 else:
                     target_character_list[index] = None  # 未识别到角色
@@ -679,10 +782,9 @@ class CurrencyWars(Executable):
 
         return target_character_list
 
-    def get_off_field_area(self, force=False, equip: bool = True):
+    def get_off_field_area(self, force=False):
         """获取后台角色信息"""
         self._get_character_in_area(areas=self.off_field_area, target_character_list=self.off_field_character,
-                                    equip=equip,
                                     force=force,
                                     count_stars=True,
                                     use_backup_ocr=True)
@@ -691,10 +793,9 @@ class CurrencyWars(Executable):
                 char.is_placed = True
         logger.info(f"当前后台角色：{self.off_field_character}")
 
-    def get_on_field_area(self, force=False, equip: bool = True):
+    def get_on_field_area(self, force=False):
         """获取前台角色信息"""
         self._get_character_in_area(areas=self.on_field_area, target_character_list=self.on_field_character,
-                                    equip=equip,
                                     force=force,
                                     count_stars=True)
         for char in self.on_field_character:
