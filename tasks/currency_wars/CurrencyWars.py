@@ -60,6 +60,7 @@ class CurrencyWars(Executable):
         }
         self.is_continue = False  # 是否是继续挑战
         self.is_game_over = False
+        self.skip_current_round = False  # 前台无角色时跳过本轮剩余流程，直接刷新角色并开始新一轮
         self.difficulty: int = Difficulty.LOWEST
         self.on_field_character: list[Character | None] = [None, None, None, None]  # 前台角色列表
         self.on_field_area: list[tuple[float, float]] = [
@@ -466,20 +467,29 @@ class CurrencyWars(Executable):
         Returns:
             True-继续执行后续初始化和游戏循环；False-中止进入流程
         """
-        if self.strategy_code and not self.is_continue:
-            self.operator.click_img(CWIMG.STRATEGY, after_sleep=1)
-            self.operator.click_img(CWIMG.HOT_STRATEGIES, after_sleep=1)
-            self.operator.move_to(0.5, 0.5)
-            self.operator.sleep(0.5)
-            self.operator.click_img(CWIMG.ENTER_STRATEGY_CODE, after_sleep=1)
-            self.operator.click_point(0.5, 0.5, after_sleep=1, tag="攻略码输入框")
-            self.operator.copy(self.strategy_code)
-            self.operator.paste()
-            self.operator.sleep(1)
-            self.operator.click_img(IMG.ENSURE2, after_sleep=1)
-            self.operator.wait_img(CWIMG.APPLY_STRATEGY)
-            self.operator.click_img(CWIMG.APPLY_STRATEGY, after_sleep=1)
-            self.operator.press_key('esc', presses=3, interval=1)
+        if self.is_continue or not self.strategy_code:
+            return True
+        self.operator.click_img(CWIMG.STRATEGY, after_sleep=1)
+        self.operator.click_img(CWIMG.HOT_STRATEGIES, after_sleep=0.5)
+        self.operator.move_to(0.5, 0.5)
+        self.operator.sleep(0.5)
+        self.operator.click_img(CWIMG.ENTER_STRATEGY_CODE, after_sleep=1)
+        self.operator.click_point(0.5, 0.5, after_sleep=1, tag="攻略码输入框")
+        self.operator.copy(self.strategy_code)
+        self.operator.paste()
+        self.operator.sleep(1)
+        self.operator.click_img(IMG.ENSURE2, after_sleep=1)
+        box = self.operator.wait_img(CWIMG.APPLY_STRATEGY)
+        if box:
+            self.operator.click_box(box, after_sleep=1)
+        else:
+            logger.warning("[应用策略] 未识别到应用策略按钮")
+        
+        # 恢复到主界面
+        self.operator.do_while(
+            lambda: self.operator.press_key('esc'),
+            lambda: self.operator.locate(CWIMG.QUIT) is None,
+            interval=0.5,            max_iterations=5)
         return True
 
     def handle_game_initialized(self) -> bool:  # NOQA
@@ -518,6 +528,11 @@ class CurrencyWars(Executable):
             self.place_character()
             self.sell_character()
             if not self.battle():
+                if self.skip_current_round:  # 前台无角色，跳过本轮剩余流程
+                    self.skip_current_round = False
+                    self.refresh_character()
+                    self.sort_all_areas_by_priority()  # 优先级排序
+                    continue
                 break
             if not self.stage_transition():
                 break
@@ -912,8 +927,17 @@ class CurrencyWars(Executable):
         if index == 1:  # 点击的是跳过按钮，战斗直接结束
             logger.info("跳过战斗")
         else:
-            if self.operator.locate(IMG.ENSURE):  # 编队未满提醒
-                self.operator.click_img(IMG.ENSURE)
+            ocr_i, ocr_b = self.operator.ocr_match_any(["无角色", "未达上限"], from_x=0.36, from_y=0.44, to_x=0.64, to_y=0.5)
+            # 检查前台区域是否有角色
+            if ocr_i != -1:
+                if ocr_i == 0:
+                    logger.error("前台区域无角色，无法出战，跳过本轮剩余流程")
+                    self.skip_current_round = True
+                    self.operator.click_img(IMG.ENSURE)
+                    return False
+                elif ocr_i == 1:
+                    logger.info("前台区域未达上限，继续战斗")
+                    self.operator.click_img(IMG.ENSURE)
             logger.info("战斗开始，等待挑战结束")
             if self.operator.wait_img(IMG.Q):
                 self.operator.press_key("v")

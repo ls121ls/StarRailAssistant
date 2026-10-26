@@ -105,6 +105,11 @@ public partial class TrailblazePowerConfig : ObservableObject
     private bool _isUseBuildTarget;
 
     [ObservableProperty]
+    [property: JsonPropertyName("materialPriority")]
+    [property: Description("培养目标材料优先：识别到材料型副本时跳过饰品提取与侵蚀隧洞，未识别到时仍保留")]
+    private bool _isMaterialPriority;
+
+    [ObservableProperty]
     [property: JsonPropertyName("activity.enabled")]
     [property: Description("是否启用多倍活动检测，启用后将优先刷取花藏繁生/异器盈界/位面分裂副本")]
     private bool _isActivityEnabled;
