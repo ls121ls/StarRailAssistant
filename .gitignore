@@ -9,6 +9,7 @@
 **/.vs/
 **/.idea/
 **/.workbuddy/
+**/output/
 
 # .NET 构建输出
 **/bin/
@@ -24,7 +25,7 @@
 /setup/SRA/
 /setup/install_info.txt
 /main.dist/
-SRAFrontend/SRAFrontend.Server/wwwroot/*
+/SRAServer/static/*
 *.zip
 
 # 构建产物

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from SRACore.models.app_settings import NotificationSettings
+from SRACore.localization import Resources
 
 
 @dataclass(frozen=True)
@@ -19,11 +20,10 @@ class NotificationContext:
 
 def format_notification_message(payload: dict[str, Any]) -> str:
     lines = [
-        "[SRA 通知]",
-        "事件: " + str(payload.get("event", "")),
-        "结果: " + str(payload.get("result", "")),
-        "时间: " + str(payload.get("timestamp", "")),
-        "消息: " + str(payload.get("message", "")),
+        Resources.notification_payloadHeader,
+        Resources.notification_payloadEvent + str(payload.get("event", "")),
+        Resources.notification_payloadResult + str(payload.get("result", "")),
+        Resources.notification_payloadTime + str(payload.get("timestamp", "")),
+        Resources.notification_payloadMessage + str(payload.get("message", "")),
     ]
     return "\n".join(lines)
-

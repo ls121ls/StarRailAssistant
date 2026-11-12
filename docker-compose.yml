@@ -1,0 +1,52 @@
+# SRA 服务端容器编排：WebUI + /api + /mcp
+#
+#   docker compose up -d
+#   浏览器打开 http://localhost:5073 （令牌在下方 SRA_ACCESS_TOKEN，WebUI 会要求填入）
+#
+# 镜像直接拉取 CI 构建好的产物（ghcr.io 公开，无需登录）。WebUI、tasks/、extensions/、
+# resources/ 都已打进镜像，启动不需要联网；要更新它们得等新的镜像标签，或改为本地构建。
+#
+# 云游戏：容器内没有桌面会话，只能用云游戏，首次启动时入口脚本会把
+#   「云游戏 + Chrome for Testing + /usr/local/bin/chromium-container + 无头模式」
+#   直接写进 settings.json，开箱即用；账号密码仍需在 WebUI 里按配置填写（加密存储）。
+services:
+  sra-server:
+    # 默认 beta 通道：版本号含 "-" 的构建（当前 2.25.0-beta.3）；正式版对应 :latest
+    # 可用 SRA_IMAGE_TAG 固定到具体版本或提交，如 v2.25.0-beta.3 / sha-9dfb20b
+    image: ghcr.io/shasnow/starrailassistant:${SRA_IMAGE_TAG:-beta}
+    # 想改用本仓库源码本地构建时，把上面一行换成：
+    #   image: sra-server:local
+    #   build: .
+    container_name: sra-server
+    restart: unless-stopped
+    ports:
+      - "5073:5073"
+    environment:
+      # 为空则 /api 全部放行；暴露到公网前务必改成自己的强随机令牌
+      SRA_ACCESS_TOKEN: "change-me"
+      SRA_HOST: "0.0.0.0"
+      SRA_PORT: "5073"
+      SRA_LOG_LEVEL: "INFO"
+      # 访客模式下 /mcp 不挂载；需要 MCP 接入时保持 false
+      SRA_VISITOR_MODE: "false"
+      TZ: "Asia/Shanghai"
+    volumes:
+      # 状态盘：settings.json / configs/ / cache/（云游戏登录态在 cache/selenium_profile 下）
+      - sra-data:/root/.config/SRA
+      # 运行日志与失败截图（log/ 按 cwd 解析）
+      - sra-log:/app/log
+    healthcheck:
+      # /openapi/v1.json 不在 /api 前缀下，不受令牌鉴权影响
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5073/openapi/v1.json', timeout=5).status == 200 else 1)"
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  sra-data:
+  sra-log:

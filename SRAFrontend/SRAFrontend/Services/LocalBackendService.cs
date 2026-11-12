@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SRAFrontend.Models;
+using SRAFrontend.Localization;
 
 namespace SRAFrontend.Services;
 
@@ -20,6 +22,8 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
     public abstract string FileName { get; set; }
     public abstract string WorkingDirectory { get; set; }
     public abstract string MainArgument { get; set; }
+    /// <summary>启动后端进程时附加/覆盖的环境变量；默认不覆盖任何变量</summary>
+    public virtual IReadOnlyDictionary<string, string>? EnvironmentVariables => null;
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action<string>? Outputted;
 
@@ -46,7 +50,7 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
         {
             logger.LogWarning("Attempted to send input to backend process, but it is not running. Input: {Input}",
                 input);
-            Outputted?.Invoke($"发送失败: 进程未运行（输入: {input}）");
+            Outputted?.Invoke(string.Format(Resources.Culture, Resources.InputSendProcessErrorMessage, input));
             return false;
         }
 
@@ -59,7 +63,7 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
         catch (IOException e)
         {
             logger.LogError(e, "Fail to send input to backend process: {Message}", e.Message);
-            Outputted?.Invoke($"发送失败: {e.Message}（输入: {input}）");
+            Outputted?.Invoke(string.Format(Resources.Culture, Resources.InputSendFailedMessage, e.Message, input));
             return false;
         }
     }
@@ -76,7 +80,7 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
         {
             logger.LogWarning("Attempted to send input to backend process, but it is not running. Input: {Input}",
                 input);
-            Outputted?.Invoke($"发送失败: 进程未运行（输入: {input}）");
+            Outputted?.Invoke(string.Format(Resources.Culture, Resources.InputSendProcessErrorMessage, input));
             return false;
         }
 
@@ -89,7 +93,7 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
         catch (IOException e)
         {
             logger.LogError(e, "Fail to send input to backend process: {Message}", e.Message);
-            Outputted?.Invoke($"发送失败: {e.Message}（输入: {input}）");
+            Outputted?.Invoke(string.Format(Resources.Culture, Resources.InputSendFailedMessage, e.Message, input));
             return false;
         }
     }
@@ -103,7 +107,7 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
         if (isExplicitPath && !File.Exists(FileName))
         {
             logger.LogError("Backend executable not found: {FileName}", FileName);
-            Outputted?.Invoke($"启动失败: 未找到后端可执行文件（路径: {FileName}）");
+            Outputted?.Invoke(string.Format(Resources.Culture, Resources.BackendExecutableMissingError, FileName));
             return false;
         }
 
@@ -120,9 +124,15 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                StandardInputEncoding = new UTF8Encoding(false, true),
+                StandardOutputEncoding = new UTF8Encoding(false, true),
+                StandardErrorEncoding = new UTF8Encoding(false, true),
                 CreateNoWindow = true,
                 WorkingDirectory = WorkingDirectory
             };
+            if (EnvironmentVariables is not null)
+                foreach (var (key, value) in EnvironmentVariables)
+                    _backendProcess.StartInfo.Environment[key] = value;
             _backendProcess.EnableRaisingEvents = true; // 启用Exited事件
             _backendProcess.OutputDataReceived += OnBackendProcessOutputDataReceived;
             _backendProcess.ErrorDataReceived += OnBackendProcessErrorDataReceived;
@@ -137,7 +147,7 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
         catch (Exception e)
         {
             logger.LogError(e, "Fail to start SRA: {Message}", e.Message);
-            Outputted?.Invoke($"启动失败: {e.Message}");
+            Outputted?.Invoke(string.Format(Resources.Culture, Resources.BackendLaunchFailedError, e.Message));
             CleanupProcessResources();
             return false;
         }
@@ -339,7 +349,7 @@ public abstract class LocalBackendService(ILogger<LocalBackendService> logger)
         logger.LogInformation("Process exited (PID: {Pid}, Exit Code: {ExitCode})", processId, exitCode);
 
         IsTaskRunning = false;
-        Outputted?.Invoke($"进程已退出（PID: {processId}，退出代码为: {exitCode}）");
+        Outputted?.Invoke(string.Format(Resources.Culture, Resources.BackendProcessExitedMessage, processId, exitCode));
 
         // 清理资源
         CleanupProcessResources();

@@ -1,6 +1,6 @@
 <template>
   <div ref="rootEl" class="anno-card">
-    <PanelCard title="公告">
+    <PanelCard :title="t('announcement.title')">
       <!-- 加载中 -->
       <div v-if="loading" class="anno-state">
         <el-skeleton :rows="5" animated />
@@ -8,12 +8,12 @@
 
       <!-- 加载失败：可重试 -->
       <div v-else-if="errorMsg" class="anno-state">
-        <el-empty description="公告加载失败" :image-size="64">
-          <el-button type="primary" size="small" @click="load">重试</el-button>
+        <el-empty :description="t('announcement.loadFailed')" :image-size="64">
+          <el-button type="primary" size="small" @click="load">{{ t('common.retry') }}</el-button>
         </el-empty>
       </div>
 
-      <el-empty v-else-if="!annos.length" description="暂无公告" :image-size="64" />
+      <el-empty v-else-if="!annos.length" :description="t('announcement.empty')" :image-size="64" />
 
       <!-- 公告列表：点击查看详情 -->
       <ul v-else class="anno-list">
@@ -38,6 +38,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, onMounted, ref } from 'vue'
 import { useIntersectionObserver } from '@vueuse/core'
 import { ArrowRight } from '@element-plus/icons-vue'
@@ -45,6 +47,8 @@ import { fetchAnnouncements } from '@/api/anno'
 import type { Announcement } from '@/api/anno'
 import { renderMarkdown } from '@/utils/markdown'
 import PanelCard from './PanelCard.vue'
+
+const { t } = useI18n()
 
 const annos = ref<Announcement[]>([])
 const loading = ref(true)

@@ -1,4 +1,4 @@
-<p align="center"><img src="/resources/SRAico.png" alt="icon"></p>
+<p align="center"><img src="/assets/SRAico.png" alt="icon"></p>
 <p align="center">
     <img src="https://img.shields.io/badge/platform-Windows-blue" alt="platform">
     <img alt="Static Badge" src="https://img.shields.io/badge/python-3.12-skyblue">
@@ -12,7 +12,7 @@
       <img alt="PyPI Version" src="https://img.shields.io/pypi/v/starrailassistant">
     </a>
 </p>
-<p align="center"><a href="https://starrailassistant.top"><b>主页</b></a> | <a href="README.en.md"><b>English</b></a></p>
+<p align="center"><a href="https://starrailassistant.top"><b>主页</b></a> | <a href="README.ru.md"><b>Русский</b></a> | <a href="README.en.md"><b>English</b></a> | <a href="README.md"><b>中文</b></a></p>
 
 #### [问题排查](https://starrailassistant.top/getting-started/trouble-shooting/) | [FAQ](https://starrailassistant.top/getting-started/faq/) | [下载和安装](https://starrailassistant.top/getting-started/download/) | [使用方法](https://starrailassistant.top/getting-started/getting-started/)
 
@@ -113,6 +113,8 @@ nothing to do with it.
 * 欢迎通过上述渠道反馈问题和提交意见！
 
 ## 🤝 想要为项目做出贡献
+
+开发群：[821445062](https://qm.qq.com/q/NpPrnQ8uUo)
 
 请阅读 [贡献指南](CONTRIBUTING.md)。
 

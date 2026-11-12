@@ -1,5 +1,5 @@
 <template>
-  <PanelCard title="任务配置">
+  <PanelCard :title="t('config.tasksTitle')">
     <!-- 加载中 -->
     <div v-if="loading" class="panel-state">
       <el-skeleton :rows="6" animated />
@@ -7,9 +7,9 @@
 
     <!-- 加载失败：可重试 -->
     <div v-else-if="errorMsg" class="panel-state">
-      <el-empty description="加载 OpenAPI 规范失败" :image-size="72">
+      <el-empty :description="t('schema.openApiLoadFailed')" :image-size="72">
         <div class="error-detail">{{ errorMsg }}</div>
-        <el-button type="primary" @click="load">重试</el-button>
+        <el-button type="primary" @click="load">{{ t('common.retry') }}</el-button>
       </el-empty>
     </div>
 
@@ -18,14 +18,14 @@
       <!-- 后端配置读取失败提示（不影响 schema 表单展示） -->
       <el-alert v-if="configsStore.detailError" class="detail-alert" type="error" :title="configsStore.detailError"
         :closable="false">
-        <el-button size="small" @click="applyBackendValues">重试</el-button>
+        <el-button size="small" @click="applyBackendValues">{{ t('common.retry') }}</el-button>
       </el-alert>
 
       <el-tabs v-model="activeTab" class="config-tabs">
         <el-tab-pane v-for="tab in tabs" :key="tab.key" :name="tab.key">
           <template #label>
             <span class="tab-label" :title="tab.key">{{ tab.label }}<span v-if="dirtyKeys.has(tab.key)"
-                class="dirty-dot" title="有未保存的更改" /></span>
+                class="dirty-dot" :title="t('common.unsaved')" /></span>
           </template>
           <div class="tab-pane-body">
             <SchemaForm :schema="tab.schema" :doc="doc" :model-value="configModel[tab.key]"
@@ -35,13 +35,13 @@
         </el-tab-pane>
       </el-tabs>
 
-      <!-- 保存：把当前表单内容 PUT 回 /api/Configs/{name} -->
+      <!-- 保存：把当前表单内容 PUT 回 /api/configs/{name} -->
       <div class="panel-footer">
-        <span class="footer-hint">{{ isDirty ? '有未保存的更改' : configName ? `当前配置：${configName}` : '未选择配置' }}</span>
+        <span class="footer-hint">{{ isDirty ? t('common.unsaved') : configName ? t('config.current', [configName]) : t('config.noneSelected') }}</span>
         <el-button type="primary" size="small"
           :disabled="!configName || !isDirty || !!configsStore.detailError || configsStore.detailLoading"
           :loading="configsStore.saving" @click="save">
-          保存配置
+          {{ t('config.save') }}
         </el-button>
       </div>
     </template>
@@ -49,15 +49,19 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { fetchOpenApiSpec } from '@/api/openapi'
 import type { TasksConfigPayload } from '@/api/configs'
 import { useConfigsStore } from '@/stores/configs'
 import type { OpenApiDocument, SchemaNode } from '@/utils/schemaForm'
-import { buildDefaultModel, resolveNode, stableStringify } from '@/utils/schemaForm'
+import { buildDefaultModel, localizedDescription, resolveNode, stableStringify } from '@/utils/schemaForm'
 import PanelCard from './PanelCard.vue'
 import SchemaForm from './SchemaForm.vue'
+
+const { t } = useI18n()
 
 const TASKS_CONFIG_REF = '#/components/schemas/TasksConfig'
 
@@ -114,7 +118,7 @@ const tabs = computed<{ key: string; label: string; schema: SchemaNode }[]>(() =
       const schema = resolveNode(d, node)
       return {
         key,
-        label: schema.description ?? node.description ?? key,
+        label: localizedDescription(schema, schema.description ?? node.description ?? key),
         schema,
       }
     })
@@ -171,9 +175,9 @@ async function save(): Promise<boolean> {
   const ok = await configsStore.saveConfig(props.configName, payload)
   if (ok) {
     baseline.value = stableStringify(configModel)
-    ElMessage.success('配置已保存')
+    ElMessage.success(t('config.saved'))
   } else {
-    ElMessage.error(configsStore.saveError || '保存失败')
+    ElMessage.error(configsStore.saveError || t('config.saveFailed'))
   }
   return ok
 }

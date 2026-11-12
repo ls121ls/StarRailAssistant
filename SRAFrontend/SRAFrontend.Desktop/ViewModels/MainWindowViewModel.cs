@@ -69,7 +69,7 @@ public partial class MainWindowViewModel(
         var view = new ActivityPageView { DataContext = viewModel };
         SukiMessageBox.ShowDialog(new SukiMessageBoxHost
         {
-            Header = "活动日历",
+            Header = Resources.EventCalendarText,
             Content = view
         });
     }

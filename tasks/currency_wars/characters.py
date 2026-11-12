@@ -73,6 +73,7 @@ class Character:
     # schools: list[School]  # 派系
     cost: int  # 费用
     positioning: Positioning  # 默认站位
+    alias: list[str] = dataclasses.field(default_factory=list)  # 别名
     position: Positioning | None = None  # 实际站位（适配攻略的特殊情况）
     priority: int | None = None  # 优先级
     is_placed: bool = False  # 是否已放置
@@ -104,57 +105,57 @@ class Characters:
     角色工具类
     提供角色信息查询、设置开拓者名称等功能
     """
-    Cyrene = Character('昔涟', 5, Positioning.OnField)
+    Cyrene = Character('昔涟', 4, Positioning.OnField)
     DanHeng_PermansorTerrae = Character('丹恒·腾荒', 2, Positioning.OffField)
-    Evernight = Character('长夜月', 4, Positioning.OnOffField)
-    Cerydra = Character('刻律德菈', 3, Positioning.OnOffField)
-    Hysilens = Character('海瑟音', 4, Positioning.OnField)
+    Evernight = Character('长夜月', 1, Positioning.OnOffField)
+    Cerydra = Character('刻律德菈', 1, Positioning.OffField, alias=['刻律德拉', '刻律德'])
+    Hysilens = Character('海瑟音', 2, Positioning.OnOffField)
     Archer = Character('Archer', 5, Positioning.OnField)
     Saber = Character('Saber', 3, Positioning.OnOffField)
-    Phainon = Character('白厄', 3, Positioning.OnField)
-    Cipher = Character('赛飞儿', 1, Positioning.OnField)
-    Hyacine = Character('风堇', 2, Positioning.OnField)
-    Anaxa = Character('那刻夏', 3, Positioning.OffField)
-    Castorice = Character('遐蝶', 4, Positioning.OnField)
+    Phainon = Character('白厄', 5, Positioning.OnOffField)
+    Cipher = Character('赛飞儿', 3, Positioning.OffField)
+    Hyacine = Character('风堇', 4, Positioning.OnOffField)
+    Anaxa = Character('那刻夏', 1, Positioning.OnField)
+    Castorice = Character('遐蝶', 3, Positioning.OnOffField)
     Mydei = Character('万敌', 2, Positioning.OnOffField)
-    Tribbie = Character('缇宝', 2, Positioning.OnOffField)
-    Aglaea = Character('阿格莱雅', 1, Positioning.OnField)
-    TheHerta = Character('大黑塔', 4, Positioning.OnField)
-    Sunday = Character('星期日', 3, Positioning.OnField)
-    Fugue = Character('忘归人', 3, Positioning.OffField)
-    Rappa = Character('乱破', 1, Positioning.OnField)
-    Lingsha = Character('灵砂', 2, Positioning.OnField)
-    Feixiao = Character('飞霄', 1, Positioning.OnField)
+    Tribbie = Character('缇宝', 4, Positioning.OnOffField)
+    Aglaea = Character('阿格莱雅', 5, Positioning.OnField)
+    TheHerta = Character('大黑塔', 2, Positioning.OnField)
+    Sunday = Character('星期日', 2, Positioning.OnOffField)
+    Fugue = Character('忘归人', 1, Positioning.OnOffField)
+    Rappa = Character('乱破', 3, Positioning.OffField)
+    Lingsha = Character('灵砂', 1, Positioning.OnOffField)
+    Feixiao = Character('飞霄', 3, Positioning.OnField)
     Moze = Character('貊泽', 1, Positioning.OffField)
-    Jiaoqiu = Character('椒丘', 1, Positioning.OnField)
-    Yunli = Character('云璃', 5, Positioning.OffField)
-    Jade = Character('翡翠', 1, Positioning.OffField)
-    Firefly = Character('流萤', 5, Positioning.OnField)
-    Boothill = Character('波提欧', 4, Positioning.OnField)
-    Robin = Character('知更鸟', 4, Positioning.OffField)
-    Aventurine = Character('砂金', 2, Positioning.OnField)
-    Acheron = Character('黄泉', 3, Positioning.OnField)
+    Jiaoqiu = Character('椒丘', 3, Positioning.OnField)
+    Yunli = Character('云璃', 2, Positioning.OnOffField)
+    Jade = Character('翡翠', 5, Positioning.OffField)
+    Firefly = Character('流萤', 2, Positioning.OnField)
+    Boothill = Character('波提欧', 1, Positioning.OnField)
+    Robin = Character('知更鸟', 2, Positioning.OnField)
+    Aventurine = Character('砂金', 4, Positioning.OnOffField)
+    Acheron = Character('黄泉', 4, Positioning.OnField)
     Gallagher = Character('加拉赫', 1, Positioning.OnOffField)
-    Sparkle = Character('花火', 2, Positioning.OffField)
-    BlackSwan = Character('黑天鹅', 5, Positioning.OffField)
+    Sparkle = Character('花火', 2, Positioning.OnField)
+    BlackSwan = Character('黑天鹅', 1, Positioning.OffField)
     DrRatio = Character('真理医生', 3, Positioning.OnField)
     RuanMei = Character('阮·梅', 2, Positioning.OffField)
     Argenti = Character('银枝', 2, Positioning.OnField)
-    Huohuo = Character('藿藿', 2, Positioning.OnOffField)
-    TopazAndNumby = Character('托帕&账账', 5, Positioning.OffField)
-    Jingliu = Character('镜流', 3, Positioning.OffField)
-    FuXuan = Character('符玄', 4, Positioning.OffField)
-    DanHeng_ImbibitorLunae = Character('丹恒·饮月', 2, Positioning.OnField)
-    Kafka = Character('卡芙卡', 2, Positioning.OnField)
-    Blade = Character('刃', 1, Positioning.OffField)
-    Luocha = Character('罗刹', 4, Positioning.OffField)
+    Huohuo = Character('藿藿', 4, Positioning.OffField)
+    TopazAndNumby = Character('托帕&账账', 1, Positioning.OnOffField)
+    Jingliu = Character('镜流', 3, Positioning.OnOffField)
+    FuXuan = Character('符玄', 3, Positioning.OffField)
+    DanHeng_ImbibitorLunae = Character('丹恒·饮月', 5, Positioning.OnField)
+    Kafka = Character('卡芙卡', 5, Positioning.OnField)
+    Blade = Character('刃', 4, Positioning.OnOffField)
+    Luocha = Character('罗刹', 3, Positioning.OnOffField)
     SilverWolf = Character('银狼', 4, Positioning.OnOffField)
-    JingYuan = Character('景元', 5, Positioning.OnField)
+    JingYuan = Character('景元', 1, Positioning.OnOffField)
     Seele = Character('希儿', 3, Positioning.OnField)
     Gepard = Character('杰帕德', 4, Positioning.OnField)
-    Natasha = Character('娜塔莎', 3, Positioning.OffField)
+    Natasha = Character('娜塔莎', 2, Positioning.OffField)
     Bronya = Character('布洛妮娅', 5, Positioning.OnField)
-    Welt = Character('瓦尔特', 5, Positioning.OnField)
+    Welt = Character('瓦尔特', 1, Positioning.OnOffField)
     Himeko = Character('姬子', 3, Positioning.OffField)
     Yanqing = Character('彦卿', 3, Positioning.OffField)
     Asta = Character('艾丝妲', 1, Positioning.OnField)
@@ -164,96 +165,39 @@ class Characters:
     Qingque = Character('青雀', 1, Positioning.OnField)
     Pela = Character('佩拉', 2, Positioning.OffField)
     Herta = Character('黑塔', 1, Positioning.OnOffField)
-    Trailblazer = Character('开拓者', 4, Positioning.OnField)
-    TheDahlia = Character('大丽花', 1, Positioning.OnOffField)
-    YaoGuang = Character('爻光', 1, Positioning.OnOffField)
-    Sparxie = Character('火花', 4, Positioning.OnField)
-    Ashveil = Character('不死途', 2, Positioning.OnOffField)
-    SilverWolfLV999 = Character('银狼LV.999', 5, Positioning.OnOffField)
+    Trailblazer = Character('开拓者', 3, Positioning.OnOffField)
+    TheDahlia = Character('大丽花', 3, Positioning.OnOffField)
+    YaoGuang = Character('爻光', 3, Positioning.OffField, alias=['交光'])
+    Sparxie = Character('火花', 1, Positioning.OnOffField)
+    Ashveil = Character('不死途', 5, Positioning.OffField)
+    SilverWolfLV999 = Character('银狼LV.999', 5, Positioning.OnField)
     Evanescia = Character('绯英', 2, Positioning.OnOffField)
-    Himoko_Nova = Character('姬子·启行', 3, Positioning.OnField)
-    Mortenax_Blade = Character('千冶·刃', 2, Positioning.OffField)
+    Himoko_Nova = Character('姬子·启行', 4, Positioning.OnField)
+    Mortenax_Blade = Character('千冶·刃', 4, Positioning.OnOffField)
     Rin_Tohsaka = Character('远坂凛', 1, Positioning.OnOffField)
     Gilgamesh = Character('吉尔伽美什', 2, Positioning.OnOffField)
+    Hanya = Character('寒鸦', 4, Positioning.OffField)
+    Robin_Summeretto = Character('知更鸟·晴歌', 2, Positioning.OnOffField)
+    Aventurine_Waveflair = Character('砂金·戏浪', 4, Positioning.OnField)
+    Guinaifen = Character('桂乃芬', 1, Positioning.OnOffField)
+    Pearl = Character('真珠', 1, Positioning.OffField)
+    Aeon_Aha = Character('星神·阿哈', 7, Positioning.OnField)
+    Clara = Character('克拉拉', 5, Positioning.OnOffField)
+    Xueyi = Character('雪衣', 5, Positioning.OnField)
+    KingPomPom = Character('帕姆王', 5, Positioning.OffField)
+    Serval = Character('希露瓦', 4, Positioning.OnField)
+    Bailu = Character('白露', 2, Positioning.OffField)
 
 
-    # 角色列表
-    characters: dict[str, Character] = {
-        '貊泽': Moze,
-        '乱破': Rappa,
-        '花火': Sparkle,
-        '遐蝶': Castorice,
-        '银枝': Argenti,
-        '丹恒·饮月': DanHeng_ImbibitorLunae,
-        '灵砂': Lingsha,
-        '大黑塔': TheHerta,
-        '托帕&账账': TopazAndNumby,
-        '景元': JingYuan,
-        '云璃': Yunli,
-        '昔涟': Cyrene,
-        '布洛妮娅': Bronya,
-        '罗刹': Luocha,
-        '知更鸟': Robin,
-        '姬子': Himeko,
-        '镜流': Jingliu,
-        '真理医生': DrRatio,
-        '那刻夏': Anaxa,
-        '长夜月': Evernight,
-        '飞霄': Feixiao,
-        '阮·梅': RuanMei,
-        '砂金': Aventurine,
-        '缇宝': Tribbie,
-        '万敌': Mydei,
-        '风堇': Hyacine,
-        '丹恒·腾荒': DanHeng_PermansorTerrae,
-        '黑塔': Herta,
-        '赛飞儿': Cipher,
-        '青雀': Qingque,
-        '刃': Blade,
-        '翡翠': Jade,
-        '瓦尔特': Welt,
-        'Archer': Archer,
-        '黑天鹅': BlackSwan,
-        '流萤': Firefly,
-        '银狼': SilverWolf,
-        '杰帕德': Gepard,
-        '符玄': FuXuan,
-        '波提欧': Boothill,
-        '彦卿': Yanqing,
-        '海瑟音': Hysilens,
-        'Saber': Saber,
-        '希儿': Seele,
-        '娜塔莎': Natasha,
-        '忘归人': Fugue,
-        '黄泉': Acheron,
-        '星期日': Sunday,
-        '白厄': Phainon,
-        '刻律德拉': Cerydra,
-        '刻律德菈': Cerydra,
-        '刻律德': Cerydra,
-        '卡芙卡': Kafka,
-        '佩拉': Pela,
-        '藿藿': Huohuo,
-        '三月七': March7th,
-        '艾丝妲': Asta,
-        '桑博': Sampo,
-        '停云': Tingyun,
-        '椒丘': Jiaoqiu,
-        '加拉赫': Gallagher,
-        '阿格莱雅': Aglaea,
-        '开拓者': Trailblazer,
-        '大丽花': TheDahlia,
-        '交光': YaoGuang,
-        '爻光': YaoGuang,
-        '火花': Sparxie,
-        '不死途': Ashveil,
-        '银狼LV.999': SilverWolfLV999,
-        '绯英': Evanescia,
-        '姬子·启行': Himoko_Nova,
-        '千冶·刃': Mortenax_Blade,
-        '远坂凛': Rin_Tohsaka,
-        '吉尔伽美什': Gilgamesh,
-    }
+
+    # 角色列表: 由类属性中的 Character 实例及其别名自动生成
+    characters: dict[str, Character] = {}
+    for _character in list(locals().values()):
+        if isinstance(_character, Character):
+            characters[_character.name] = _character
+            for _alias in _character.alias:
+                characters[_alias] = _character
+    del _character, _alias
     username = '开拓者'  # 角色名称
 
     @classmethod

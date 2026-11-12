@@ -22,6 +22,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import AnnouncementCard from '@/components/AnnouncementCard.vue'
@@ -31,7 +33,9 @@ import TasksConfigPanel from '@/components/TasksConfigPanel.vue'
 import { useTaskRunner } from '@/composables/useTaskRunner'
 import { useConfigsStore } from '@/stores/configs'
 
-// 配置列表来自后端 /api/Configs；选中名由 store 持久化到 localStorage
+const { t } = useI18n()
+
+// 配置列表来自后端 /api/configs；选中名由 store 持久化到 localStorage
 const configsStore = useConfigsStore()
 const selectedConfig = computed({
   get: () => configsStore.currentName,
@@ -59,11 +63,11 @@ async function handleConfigChange(next: string) {
   if (panel?.isDirty) {
     try {
       await ElMessageBox.confirm(
-        `配置「${selectedConfig.value}」有未保存的更改，切换前是否保存？`,
-        '未保存的更改',
+        t('config.unsavedSwitchConfirm', [selectedConfig.value]),
+        t('config.unsavedTitle'),
         {
-          confirmButtonText: '保存并切换',
-          cancelButtonText: '放弃更改',
+          confirmButtonText: t('config.saveAndSwitch'),
+          cancelButtonText: t('config.discardChanges'),
           distinguishCancelAndClose: true,
           type: 'warning',
         },
@@ -81,20 +85,20 @@ async function handleConfigChange(next: string) {
 /** 新建配置：成功后切换到新配置（复用切换流程，保留未保存更改检查） */
 async function handleConfigCreate(name: string) {
   if (!(await configsStore.createConfig(name))) {
-    ElMessage.error(configsStore.saveError || '新建配置失败')
+    ElMessage.error(configsStore.saveError || t('config.createFailed'))
     return
   }
-  ElMessage.success(`配置「${name}」已创建`)
+  ElMessage.success(t('config.created', [name]))
   await handleConfigChange(name)
 }
 
 /** 删除配置：删除的是当前配置时回退选中第一个剩余配置 */
 async function handleConfigRemove(name: string) {
   if (!(await configsStore.removeConfig(name))) {
-    ElMessage.error(configsStore.saveError || '删除配置失败')
+    ElMessage.error(configsStore.saveError || t('config.deleteFailed'))
     return
   }
-  ElMessage.success(`配置「${name}」已删除`)
+  ElMessage.success(t('config.deleted', [name]))
   configsStore.normalizeSelection()
 }
 
@@ -108,14 +112,14 @@ onMounted(async () => {
 /** 启动任务：以当前选中配置运行，结果通过消息提示 */
 async function handleStart() {
   if (!selectedConfig.value) {
-    ElMessage.warning('请先选择运行配置')
+    ElMessage.warning(t('config.selectFirst'))
     return
   }
   try {
     await task.start(selectedConfig.value)
-    ElMessage.success('任务已启动')
+    ElMessage.success(t('task.started'))
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '启动任务失败')
+    ElMessage.error(err instanceof Error ? err.message : t('task.startFailed'))
   }
 }
 
@@ -123,9 +127,9 @@ async function handleStart() {
 async function handleStop() {
   try {
     await task.stop()
-    ElMessage.success('已发送停止指令')
+    ElMessage.success(t('task.stopSent'))
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '停止任务失败')
+    ElMessage.error(err instanceof Error ? err.message : t('task.stopFailed'))
   }
 }
 </script>

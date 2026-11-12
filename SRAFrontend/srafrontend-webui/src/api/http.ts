@@ -1,8 +1,9 @@
+import { i18n } from '@/locales'
 import axios, { type AxiosRequestConfig, type AxiosInstance } from 'axios'
 
 // axios 扩展：
 // - rawEnvelope：跳过「success=false 抛错」的统一处理，
-//   供需要自行解读 R 包装的接口使用（如 /api/Task/status 空闲时返回 success=false）
+//   供需要自行解读 R 包装的接口使用（如 /api/task/status 空闲时返回 success=false）
 // - skipAuthHeader：不附加 X-Access-Token 请求头，
 //   供认证探测/校验接口使用（登录页提交新 token 时，本地遗留的旧 token 会先于请求体被后端校验）
 declare module 'axios' {
@@ -76,25 +77,25 @@ export function setUnauthorizedHandler(handler: (() => void) | null): void {
 export function statusMessage(status: number): string {
   switch (status) {
     case 400:
-      return '请求参数无效'
+      return i18n.global.t('http.badRequest')
     case 401:
-      return '未授权，请先完成认证'
+      return i18n.global.t('http.unauthorized')
     case 403:
-      return '没有访问权限'
+      return i18n.global.t('http.forbidden')
     case 404:
-      return '资源不存在'
+      return i18n.global.t('http.notFound')
     case 409:
-      return '资源已存在或状态冲突'
+      return i18n.global.t('http.conflict')
     case 422:
-      return '请求校验失败'
+      return i18n.global.t('http.validationFailed')
     case 500:
-      return '服务器内部错误'
+      return i18n.global.t('http.serverError')
     case 502:
     case 503:
     case 504:
-      return '服务暂不可用，请稍后重试'
+      return i18n.global.t('http.unavailable')
     default:
-      return `请求失败（HTTP ${status}）`
+      return i18n.global.t('http.statusFailed', [status])
   }
 }
 
@@ -108,10 +109,10 @@ function toApiError(err: unknown): ApiError {
   if (err instanceof ApiError) return err
 
   if (axios.isAxiosError(err)) {
-    if (err.code === 'ERR_CANCELED') return new ApiError('请求已取消', undefined, true)
+    if (err.code === 'ERR_CANCELED') return new ApiError(i18n.global.t('http.canceled'), undefined, true)
     if (err.code === 'ECONNABORTED')
-      return new ApiError('请求超时，请检查后端服务是否可用', err.response?.status)
-    if (!err.response) return new ApiError('网络异常，无法连接到后端服务')
+      return new ApiError(i18n.global.t('http.timeout'), err.response?.status)
+    if (!err.response) return new ApiError(i18n.global.t('http.networkError'))
 
     const status = err.response.status
     const body: unknown = err.response.data
@@ -136,7 +137,7 @@ export function createHttpClient(): AxiosInstance {
     timeout: 15_000,
   })
 
-  // 请求拦截：附加认证 token（后端启用认证时 /api/Auth 校验通过后保存），
+  // 请求拦截：附加认证 token（后端启用认证时 /api/auth 校验通过后保存），
   // 所有业务请求自动携带 X-Access-Token；探测/校验接口用 skipAuthHeader 排除
   client.interceptors.request.use((config) => {
     const token = getStoredToken()
@@ -156,7 +157,7 @@ export function createHttpClient(): AxiosInstance {
         typeof body.success === 'boolean' &&
         !body.success
       ) {
-        throw new ApiError(body.message || '请求失败', response.status)
+        throw new ApiError(body.message || i18n.global.t('http.requestFailed'), response.status)
       }
       return response
     },

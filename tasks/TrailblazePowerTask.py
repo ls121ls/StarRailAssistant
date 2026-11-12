@@ -1,6 +1,7 @@
 import tomllib
 from typing import Callable, TypedDict
 
+from SRACore.localization import Resources
 from SRACore.models.tasks_config import TrailblazePowerTaskItem
 from SRACore.operators.model import Box
 from SRACore.task import BaseTask, task
@@ -402,7 +403,7 @@ class TrailblazePowerTask(BaseTask):
             return False
         if not self.find_level(level):
             return False
-        if not self.operator.click_img(level, x_offset=700):
+        if not self.operator.click_img(level, x_offset=770):
             logger.error("点击关卡失败")
             return False
         if not self.operator.wait_img(TPIMG.ORNAMENT_EXTRACTION_PAGE, timeout=20):  # 等待传送
@@ -576,11 +577,16 @@ class TrailblazePowerTask(BaseTask):
                     if not self.operator.click_img(TPIMG.QUIT_BATTLE):
                         logger.error("退出战斗失败")
                     logger.info("退出战斗")
-                    result, _ = self.operator.wait_any_img([TPIMG.BATTLE, IMG.ENTER], timeout=10)
+                    result, _ = self.operator.wait_any_img([TPIMG.BATTLE, IMG.ENTER, TPIMG.LIGHT_CONE])
                     if result == 0:
                         self.operator.press_key("esc", wait=1)
                     elif result == 1:
                         pass
+                    elif result == 2:
+                        logger.info("获得光锥")
+                        self.operator.click_point(0.5, 0.8)  # 点击屏幕中心偏下位置关闭弹窗
+                        self.operator.sleep(1)
+                        self.operator.press_key("esc", wait=1)
                     break
             if self.config.TrailblazePower.isUseAssistant:
                 self.support()
@@ -596,11 +602,16 @@ class TrailblazePowerTask(BaseTask):
                 if not self.operator.click_img(TPIMG.QUIT_BATTLE):
                     logger.error("退出战斗失败")
             logger.info("退出战斗")
-            resources, _ = self.operator.wait_any_img([TPIMG.BATTLE, IMG.ENTER])
+            resources, _ = self.operator.wait_any_img([TPIMG.BATTLE, IMG.ENTER, TPIMG.LIGHT_CONE])
             if resources == 0:
                 self.operator.press_key("esc", wait=1)
             elif resources == 1:
                 pass
+            elif resources == 2:
+                logger.info("获得光锥")
+                self.operator.click_point(0.5, 0.8)  # 点击屏幕中心偏下位置关闭弹窗
+                self.operator.sleep(1)
+                self.operator.press_key("esc", wait=1)
 
     def wait_battle_end(self):
         """Wait battle end
@@ -624,14 +635,10 @@ class TrailblazePowerTask(BaseTask):
             index, _ = self.operator.locate_any([
                 TPIMG.QUIT_BATTLE,
                 TPIMG.BATTLE_FAILURE,
-                TPIMG.LIGHT_CONE
             ], trace=False)
             if index == -1:
                 continue  # 继续等待战斗结束
-            if index == 2:
-                logger.info("获得光锥")
-                self.operator.click_point(0.5, 0.8)  # 点击屏幕中心偏下位置关闭弹窗
-                continue  # 继续检测战斗结束状态
+
             logger.info("战斗结束")
             return index
 
@@ -836,7 +843,7 @@ class TrailblazePowerTask(BaseTask):
         if self.__class__.__name__ in on_complete:
             self.goto_survival_index()  # 在生存索引页面发送通知
             self.send_notification(
-                f"任务 {self.__class__.__name__} 执行完成。",
+                Resources.notification_taskCompleted(self.__class__.__name__),
                 "success",
                 self.operator.screenshot())
             self.operator.press_key('esc')

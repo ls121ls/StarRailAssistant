@@ -7,8 +7,8 @@ export interface NavSection {
 </script>
 
 <template>
-  <PanelCard title="设置导航">
-    <nav class="nav" aria-label="设置项导航">
+  <PanelCard :title="t('settings.navTitle')">
+    <nav class="nav" :aria-label="t('settings.navAria')">
       <!-- 仅展示大类：点击滚动到对应 section -->
       <button v-for="section in sections" :key="section.key" type="button" class="nav-item"
         :class="{ active: activeKey === section.key }" :aria-current="activeKey === section.key ? 'true' : undefined"
@@ -20,7 +20,11 @@ export interface NavSection {
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import PanelCard from './PanelCard.vue'
+
+const { t } = useI18n()
 
 defineProps<{
   sections: NavSection[]

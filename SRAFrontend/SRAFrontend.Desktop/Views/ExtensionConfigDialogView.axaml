@@ -1,15 +1,16 @@
 <UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:lang="clr-namespace:SRAFrontend.Localization;assembly=SRAFrontend"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:suki="https://github.com/kikipoulet/SukiUI"
              xmlns:viewModels="clr-namespace:SRAFrontend.Desktop.ViewModels"
              mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="500"
-             Width="450" Height="500"
+             Width="560"
              x:Class="SRAFrontend.Desktop.Views.ExtensionConfigDialogView"
              x:DataType="viewModels:ExtensionConfigDialogViewModel">
     <UserControl.DataTemplates>
-        <!-- ssyb：枚举字段共用选项和扫描入口。 -->
+        <!-- ssyb：枚举字段共用下拉选项与自定义输入。 -->
         <DataTemplate DataType="viewModels:EnumFieldViewModel">
             <StackPanel Spacing="4" Margin="0,6" ToolTip.Tip="{Binding Description}">
                 <Label Content="{Binding Label}" FontSize="14"/>
@@ -26,19 +27,10 @@
                     </ComboBox.ItemTemplate>
                 </ComboBox>
                 <StackPanel Spacing="4" IsVisible="{Binding AllowCustom}">
-                    <TextBlock Text="或填写攻略 JSON 的完整路径" FontSize="12" Opacity="0.6"/>
+                    <TextBlock Text="{x:Static lang:Resources.StrategyPathPlaceholder}" FontSize="12" Opacity="0.6"/>
                     <TextBox Text="{Binding RawText, Mode=TwoWay}"
-                             PlaceholderText="攻略 JSON 的完整路径"/>
+                             PlaceholderText="{x:Static lang:Resources.StrategyFullPathText}"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Refreshable}">
-                    <Button Content="{Binding RefreshLabel}" Command="{Binding RefreshOptionsCommand}"/>
-                    <TextBlock Text="扫描中..." IsVisible="{Binding IsRefreshing}"
-                               VerticalAlignment="Center" FontSize="12"/>
-                </StackPanel>
-                <TextBlock Text="{Binding OptionsStatus}" FontSize="12" Opacity="0.6"
-                           IsVisible="{Binding Refreshable}"/>
-                <TextBlock Text="{Binding RefreshError}" FontSize="12" Foreground="#D94343"
-                           TextWrapping="Wrap" IsVisible="{Binding HasRefreshError}"/>
             </StackPanel>
         </DataTemplate>
         <DataTemplate DataType="viewModels:StringFieldViewModel">
@@ -47,7 +39,7 @@
                 <TextBlock Text="{Binding Description}" FontSize="12"
                            Opacity="0.6" TextWrapping="Wrap"
                            IsVisible="{Binding HasDescription}"/>
-                <TextBox Text="{Binding Value}" PlaceholderText="请输入文本"/>
+                <TextBox Text="{Binding Value}" PlaceholderText="{x:Static lang:Resources.TextInputPlaceholder}"/>
             </StackPanel>
         </DataTemplate>
         <DataTemplate DataType="viewModels:IntegerFieldViewModel">
@@ -72,11 +64,17 @@
             </StackPanel>
         </DataTemplate>
     </UserControl.DataTemplates>
-    <suki:BusyArea IsBusy="{Binding IsLoading}" BusyText="加载配置中...">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto"
-                      Margin="16">
+    <suki:BusyArea IsBusy="{Binding IsLoading}" BusyText="{x:Static lang:Resources.LoadingConfigurationMessage}">
+        <!-- 滚动交给 SukiMessageBoxHost，避免内外两层 ScrollViewer 各出一条滚动条。 -->
+        <StackPanel Margin="16">
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                <TextBlock Grid.Column="0" Text="{Binding RefreshError}" FontSize="12" Foreground="#D94343"
+                           TextWrapping="Wrap" VerticalAlignment="Center"
+                           IsVisible="{Binding HasRefreshError}"/>
+                <Button Grid.Column="1" Content="{x:Static lang:Resources.RefreshText}"
+                        Command="{Binding RefreshCommand}" VerticalAlignment="Center"/>
+            </Grid>
             <ItemsControl ItemsSource="{Binding Fields}"/>
-        </ScrollViewer>
+        </StackPanel>
     </suki:BusyArea>
 </UserControl>

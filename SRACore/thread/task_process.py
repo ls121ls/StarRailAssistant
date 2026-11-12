@@ -1,10 +1,10 @@
 import importlib
 from typing import Any
 
-from SRACore.localization import Resource
+from SRACore.localization import Resources
 from SRACore.notification import try_send_notification
 from SRACore.operators.factory import OperatorFactory, OperatorType
-from SRACore.service.setting_service import SettingsService
+from SRACore.services.setting_service import SettingsService
 from SRACore.task import BaseTask, get_task_classes, task_registry
 from SRACore.thread.runner import Runner
 from SRACore.util.data_persister import load_cache, load_config
@@ -19,10 +19,10 @@ class TaskManager(Runner):
     继承 Runner，与 ExtensionRunner 共享单线程互斥模型。
     """
 
-    def __init__(self, settings_service: SettingsService):
+    def __init__(self, settings: SettingsService):
         super().__init__()
-        self.settings_service: SettingsService = settings_service
-        self._recovery = TaskRecovery(settings_service.settings)
+        self.settings: SettingsService = settings
+        self._recovery = TaskRecovery(settings.settings)
         logger.debug(f"Successfully load task: {self.task_list}")
 
     @property
@@ -61,7 +61,7 @@ class TaskManager(Runner):
         4. 任务失败时支持自动重试（重启游戏后从当前配置重新开始）
         """
         self.stop_event.clear()
-        self._recovery.settings = self.settings_service.settings
+        self._recovery.settings = self.settings.settings
         self._recovery.reset()
         self._reset_info("run")
 
@@ -83,7 +83,7 @@ class TaskManager(Runner):
                 config_name = config_list[ci]
                 if self.stop_event.is_set():
                     return False
-                logger.info(Resource.task_currentConfig(config_name))
+                logger.info(Resources.task_currentConfig(config_name))
 
                 # 获取当前配置需要执行的任务列表
                 tasks_to_run = self.get_tasks(config_name)
@@ -91,7 +91,7 @@ class TaskManager(Runner):
                     last_operator = tasks_to_run[0].operator
                 logger.debug(f'tasks_to_run: {tasks_to_run}')
                 if not tasks_to_run:
-                    logger.warning(Resource.task_noSelectedTasks(config_name))
+                    logger.warning(Resources.task_noSelectedTasks(config_name))
                     continue
 
                 # 依次执行任务
@@ -108,7 +108,7 @@ class TaskManager(Runner):
                             # 如果是用户主动停止，直接返回，不触发重试
                             if self.stop_event.is_set():
                                 return False
-                            logger.error(Resource.task_taskFailed(str(task)))
+                            logger.error(Resources.task_taskFailed(str(task)))
                             task.on_failed()
                             # 尝试重试
                             if self._recovery.should_retry():
@@ -126,7 +126,7 @@ class TaskManager(Runner):
                         if self.stop_event.is_set():
                             return False
                         # 捕获任务执行中的异常（如未处理的错误）
-                        logger.exception(Resource.task_taskCrashed(str(task), str(e)))
+                        logger.exception(Resources.task_taskCrashed(str(task), str(e)))
                         task.on_failed()
                         # 尝试重试
                         if self._recovery.should_retry():
@@ -156,14 +156,14 @@ class TaskManager(Runner):
                                 except Exception as e:
                                     logger.error(f"重试时启动游戏异常: {e}")
                                     return False
-                        logger.info(Resource.task_retryFromConfig(config_name))
+                        logger.info(Resources.task_retryFromConfig(config_name))
                         config_start_index = ci
                         retry_triggered = True
                         break  # 跳出 tasks 循环，重新开始当前配置
                     else:
                         return False
 
-                logger.info(Resource.task_configCompleted(config_name))
+                logger.info(Resources.task_configCompleted(config_name))
                 logger.info("=" * 50)
 
             if not retry_triggered:
@@ -175,9 +175,9 @@ class TaskManager(Runner):
         except Exception:
             screenshot = None
         try_send_notification(
-            self.settings_service.settings.Notification,
-            Resource.task_notificationTitle,
-            Resource.task_notificationMessage,
+            self.settings.settings.Notification,
+            Resources.task_notificationTitle,
+            Resources.task_notificationMessage,
             image=screenshot
         )
         return True
@@ -188,8 +188,8 @@ class TaskManager(Runner):
         if config is None:
             return None
         try:
-            optype = OperatorType.Browser if self.settings_service.settings.General.isCloudGameEnabled else OperatorType.Local
-            operator = OperatorFactory.get_operator(optype, self.settings_service.settings, self.stop_event)
+            optype = OperatorType.Browser if self.settings.settings.General.isCloudGameEnabled else OperatorType.Local
+            operator = OperatorFactory.get_operator(optype, self.settings.settings, self.stop_event)
             # StartGameTask 是第一个任务（index=0）
             if len(self.task_list) > 0:
                 return self.task_list[0](operator, config)
@@ -228,8 +228,8 @@ class TaskManager(Runner):
         if not task_select:
             return []
         tasks = []
-        optype = OperatorType.Browser if self.settings_service.settings.General.isCloudGameEnabled else OperatorType.Local
-        operator = OperatorFactory.get_operator(optype, self.settings_service.settings, self.stop_event)
+        optype = OperatorType.Browser if self.settings.settings.General.isCloudGameEnabled else OperatorType.Local
+        operator = OperatorFactory.get_operator(optype, self.settings.settings, self.stop_event)
 
         # 遍历 task_select，根据选择状态实例化对应任务
         for index, is_select in enumerate(task_select):
@@ -239,7 +239,7 @@ class TaskManager(Runner):
                     # 实例化任务类
                     tasks.append(self.task_list[index](operator, config))
                 except Exception as e:
-                    logger.exception(Resource.task_instantiateFailed(index, str(e)))
+                    logger.exception(Resources.task_instantiateFailed(index, str(e)))
         return tasks
 
     def run_task(self, task: int | str, config: str | None = None) -> bool:
@@ -268,7 +268,7 @@ class TaskManager(Runner):
         task_instance = self.get_task(config, task_name)
         self._set_progress(0, 1)
         if task_instance is None:
-            logger.error(Resource.task_noSuchTask(task_name))
+            logger.error(Resources.task_noSuchTask(task_name))
             return False
         self.stop_event.clear()
         try:
@@ -278,10 +278,10 @@ class TaskManager(Runner):
             # 运行任务
             result = task_instance.run()
             if not result:
-                logger.error(Resource.task_taskFailed(str(task_instance)))
+                logger.error(Resources.task_taskFailed(str(task_instance)))
                 task_instance.on_failed()
             else:
-                logger.info(Resource.task_taskCompleted(str(task_instance)))
+                logger.info(Resources.task_taskCompleted(str(task_instance)))
                 # 单次运行：完成
                 task_instance.on_completed()
             self._set_progress(1, 1)
@@ -332,9 +332,9 @@ class TaskManager(Runner):
             print_config["startGame"]["username"] = "******"
             logger.debug('config: ' + str(print_config))
             # 实例化任务类
-            optype = OperatorType.Browser if self.settings_service.settings.General.isCloudGameEnabled else OperatorType.Local
-            operator = OperatorFactory.get_operator(optype, self.settings_service.settings, self.stop_event)
+            optype = OperatorType.Browser if self.settings.settings.General.isCloudGameEnabled else OperatorType.Local
+            operator = OperatorFactory.get_operator(optype, self.settings.settings, self.stop_event)
             return task_class(operator, config)
         except Exception as e:
-            logger.error(Resource.task_instantiateFailed(task, f'{e.__class__.__name__}: {e}'))
+            logger.error(Resources.task_instantiateFailed(task, f'{e.__class__.__name__}: {e}'))
             return None

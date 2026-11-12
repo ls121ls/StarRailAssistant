@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text.Json;
+using SRAFrontend.Localization;
 
 namespace SRAFrontend.Utils;
 
@@ -137,15 +138,55 @@ public static class ZipUtil
         return $"{value:0.##} TB";
     }
 
+    /// <summary>
+    ///     删除旧版本清单中存在、而当前清单中已不存在的文件。应用内更新只做 MD5 增量覆盖、
+    ///     不删除旧文件，据此回收被移除的依赖、旧运行时等残留；日志与用户自建文件从不出现在
+    ///     清单中，因此不会被误删。
+    /// </summary>
+    /// <param name="baseDir">应用根目录</param>
+    /// <param name="previousManifest">更新前的 MD5 清单</param>
+    /// <returns>成功删除的文件数、释放的字节数与删除失败（可能被占用）的文件列表</returns>
+    /// <exception cref="FileNotFoundException">当前清单不存在时抛出</exception>
+    /// <exception cref="InvalidDataException">当前清单不是合法 JSON 时抛出</exception>
+    public static (int DeletedCount, long FreedBytes, IReadOnlyList<string> FailedFiles) RemoveObsoleteFiles(
+        string baseDir, IReadOnlyDictionary<string, string> previousManifest)
+    {
+        var currentManifest = LoadManifest(baseDir);
+        var obsolete = previousManifest.Keys
+            .Where(relativePath => !currentManifest.ContainsKey(relativePath))
+            .Where(relativePath => File.Exists(Path.Combine(baseDir, relativePath)))
+            .ToList();
+        return DeleteFiles(baseDir, obsolete);
+    }
+
+    /// <summary>
+    ///     尝试读取应用目录下的 MD5 完整性清单；清单缺失或内容非法时返回 false 而不抛异常。
+    /// </summary>
+    /// <param name="baseDir">应用根目录</param>
+    /// <param name="manifest">读取到的清单，失败时为空字典</param>
+    public static bool TryLoadManifest(string baseDir, out Dictionary<string, string> manifest)
+    {
+        try
+        {
+            manifest = LoadManifest(baseDir);
+            return true;
+        }
+        catch (Exception e) when (e is FileNotFoundException or InvalidDataException or JsonException)
+        {
+            manifest = [];
+            return false;
+        }
+    }
+
     /// <summary>读取应用目录下的 MD5 完整性清单</summary>
     /// <exception cref="FileNotFoundException">清单文件不存在时抛出</exception>
     /// <exception cref="InvalidDataException">清单文件不是合法 JSON 时抛出</exception>
     private static Dictionary<string, string> LoadManifest(string baseDir)
     {
         var manifestPath = Path.Combine(baseDir, ManifestFileName);
-        if (!File.Exists(manifestPath)) throw new FileNotFoundException("未找到 MD5 完整性清单", manifestPath);
+        if (!File.Exists(manifestPath)) throw new FileNotFoundException(Resources.Md5ManifestMissingError, manifestPath);
         var manifest = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(manifestPath));
-        if (manifest is null || manifest.Count == 0) throw new InvalidDataException("MD5 清单内容为空或格式错误");
+        if (manifest is null || manifest.Count == 0) throw new InvalidDataException(Resources.Md5ManifestInvalidError);
         return manifest;
     }
 
@@ -174,7 +215,7 @@ public static class ZipUtil
     public static void Unzip(string zipFilePath, string targetDir)
     {
         // 基础校验：确保ZIP文件存在
-        if (!File.Exists(zipFilePath)) throw new FileNotFoundException("ZIP文件不存在", zipFilePath);
+        if (!File.Exists(zipFilePath)) throw new FileNotFoundException(Resources.ZipFileMissingError, zipFilePath);
         // 确保目标目录存在
         Directory.CreateDirectory(targetDir);
         // 生成临时解压目录（避免与现有文件冲突）

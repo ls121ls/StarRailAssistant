@@ -1,0 +1,26 @@
+{
+    "title": "【6连击3奇兽花园】我的天哪，阿格莱雅大人！",
+    "description": "前期凑出连击和奇兽花园，过程中补连击羁绊角色，在获得阿格莱雅之前主要靠那刻夏输出，后期可以将那刻夏的装备给阿格莱雅。",
+    "author": "夏日专属相片",
+    "uploader": "yukikage@qq.com",
+    "share_code": "##Hjs0ZvZbA58D6kHHzYpzT4jtYiiNnPyrByGRz0bQeho=##",
+    "min_coins": 40,
+    "min_level": 7,
+    "mid_level": 9,
+    "on_field": {
+        "阿格莱雅": 1,
+        "风堇": 1,
+        "星期日": 1,
+        "那刻夏": 1,
+        "长夜月": 1
+    },
+    "off_field": {
+        "刻律德菈": 1,
+        "藿藿": 1,
+        "寒鸦": 1,
+        "镜流": 1,
+        "知更鸟•晴歌": 1,
+        "白露": 1,
+        "赛飞儿": 1
+    }
+}

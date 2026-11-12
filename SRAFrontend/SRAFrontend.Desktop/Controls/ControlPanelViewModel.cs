@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -17,6 +18,15 @@ public partial class ControlPanelViewModel : ViewModelBase
     private readonly CommonModel _commonModel;
     [ObservableProperty] private bool _isAddConfigOpen;
     [ObservableProperty] private string _newConfigName = "";
+
+    /// <summary>
+    /// 开始按钮与停止按钮在控制面板上占据同一位置，任务启动后立即互换显示：
+    /// 连击（或点击被游戏窗口激活流程“吞噬”的重复点击）会落到刚出现的停止按钮上，
+    /// 导致任务刚启动就被停止。启动后的短时间内忽略停止请求。
+    /// </summary>
+    private static readonly TimeSpan StopGuardWindow = TimeSpan.FromSeconds(2);
+
+    private DateTime _lastStartRequestUtc = DateTime.MinValue;
 
     public ControlPanelViewModel(
         IBackendService backendService,
@@ -68,21 +78,23 @@ public partial class ControlPanelViewModel : ViewModelBase
         {
             case "Current":
                 Save();
+                _lastStartRequestUtc = DateTime.UtcNow;
                 if (await _backendService.TaskRunAsync(Cache.CurrentConfigName))
-                    _commonModel.ShowSuccessToast("任务启动成功", $"已启动配置：{Cache.CurrentConfigName}");
+                    _commonModel.ShowSuccessToast(Resources.TaskStartSuccessMessage, string.Format(Resources.Culture, Resources.ConfigurationStartedMessage, Cache.CurrentConfigName));
                 else
-                    _commonModel.ShowErrorToast("任务启动失败", $"无法启动配置：{Cache.CurrentConfigName}，请检查后端状态。");
+                    _commonModel.ShowErrorToast(Resources.TaskStartFailedError, string.Format(Resources.Culture, Resources.ConfigurationStartFailedError, Cache.CurrentConfigName));
                 break;
             case "All":
                 Save();
+                _lastStartRequestUtc = DateTime.UtcNow;
                 if (await _backendService.TaskRunAsync(null))
-                    _commonModel.ShowSuccessToast("任务启动成功", "已启动所有配置任务。");
+                    _commonModel.ShowSuccessToast(Resources.TaskStartSuccessMessage, Resources.AllConfigurationsStartedMessage);
                 else
-                    _commonModel.ShowErrorToast("任务启动失败", "无法启动所有配置任务，请检查后端状态。");
+                    _commonModel.ShowErrorToast(Resources.TaskStartFailedError, Resources.AllConfigurationsStartFailedError);
                 break;
             case "Save Only":
                 Save();
-                _commonModel.ShowSuccessToast("保存成功", "已保存当前配置。");
+                _commonModel.ShowSuccessToast(Resources.SaveSuccessMessage, Resources.ConfigurationSavedMessage);
                 break;
         }
     }
@@ -90,15 +102,18 @@ public partial class ControlPanelViewModel : ViewModelBase
     public async Task StartSingleTask(string configName)
     {
         Save();
+        _lastStartRequestUtc = DateTime.UtcNow;
         if (await _backendService.TaskSingleAsync(configName, null))
-            _commonModel.ShowSuccessToast("任务启动成功", "已启动任务");
+            _commonModel.ShowSuccessToast(Resources.TaskStartSuccessMessage, Resources.TaskStartedMessage);
         else
-            _commonModel.ShowErrorToast("任务启动失败", "无法启动任务，请检查后端状态。");
+            _commonModel.ShowErrorToast(Resources.TaskStartFailedError, Resources.TaskStartBackendErrorMessage);
     }
 
     [RelayCommand]
     private async Task StopButton()
     {
+        // 刚发出启动请求时忽略停止，避免点击落到互换位置后的停止按钮上（任务启动即停止）
+        if (DateTime.UtcNow - _lastStartRequestUtc < StopGuardWindow) return;
         await _backendService.TaskStopAsync();
     }
 
@@ -123,7 +138,7 @@ public partial class ControlPanelViewModel : ViewModelBase
             return;
         if (NewConfigName.IndexOfAny(['\\', '/', ':', '*', '?', '"', '<', '>', '|']) != -1)
         {
-            _commonModel.ShowErrorToast("无效的配置名称", "配置名称不能包含以下字符：\\ / : * ? \" < > |");
+            _commonModel.ShowErrorToast(Resources.InvalidConfigurationNameError, Resources.InvalidConfigurationNameCharsMessage);
             return;
         }
         Cache.ConfigNames.Add(NewConfigName);

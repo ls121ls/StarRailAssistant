@@ -1,3 +1,4 @@
+import { i18n } from '@/locales'
 export default {
   title: 'SRA WebUI',
   logo: 'favicon.ico',
@@ -7,6 +8,6 @@ export default {
   /** GitHub 仓库地址（关于页展示仓库信息，owner/name 从该地址解析） */
   repoUrl: 'https://github.com/Shasnow/StarRailAssistant',
   /** 项目描述（GitHub 实时信息不可用时兜底展示） */
-  description: '基于 Web UI 的星穹铁道自动化助手控制台',
+  description: i18n.global.t('app.description'),
   bgUrl: '/api/app/background',
 }

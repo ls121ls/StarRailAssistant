@@ -7,9 +7,9 @@
 
     <!-- schema 加载失败：可重试 -->
     <div v-else-if="errorMsg" class="page-state">
-      <el-empty description="加载设置项失败" :image-size="72">
+      <el-empty :description="t('settings.loadFailed')" :image-size="72">
         <div class="error-detail">{{ errorMsg }}</div>
-        <el-button type="primary" @click="load">重试</el-button>
+        <el-button type="primary" @click="load">{{ t('common.retry') }}</el-button>
       </el-empty>
     </div>
 
@@ -22,7 +22,7 @@
       <section class="content-col">
         <!-- 后端设置读取失败：不阻塞表单展示（仅展示 schema 默认值），可重试 -->
         <el-alert v-if="settingsError" class="settings-alert" type="error" :title="settingsError" :closable="false">
-          <el-button size="small" @click="loadSettings">重试</el-button>
+          <el-button size="small" @click="loadSettings">{{ t('common.retry') }}</el-button>
         </el-alert>
 
         <!-- 每个 section 一张卡片，字段挂 data-anchor 供导航定位 -->
@@ -34,7 +34,7 @@
         <div class="settings-footer">
           <span class="footer-hint">{{ footerHint }}</span>
           <el-button type="primary" size="small" :disabled="!isDirty" :loading="saving" @click="save">
-            保存设置
+            {{ t('settings.save') }}
           </el-button>
         </div>
       </section>
@@ -43,6 +43,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { ElMessage } from 'element-plus'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { fetchOpenApiSpec } from '@/api/openapi'
@@ -52,7 +54,9 @@ import SettingsNavCard from '@/components/SettingsNavCard.vue'
 import type { NavSection } from '@/components/SettingsNavCard.vue'
 import SettingsSectionCard from '@/components/SettingsSectionCard.vue'
 import type { OpenApiDocument, SchemaNode } from '@/utils/schemaForm'
-import { buildDefaultModel, resolveNode, stableStringify } from '@/utils/schemaForm'
+import { buildDefaultModel, localizedDescription, resolveNode, stableStringify } from '@/utils/schemaForm'
+
+const { t } = useI18n()
 
 /** AppSettings 在 OpenAPI 规范中的引用路径 */
 const SETTINGS_REF = '#/components/schemas/AppSettings'
@@ -87,7 +91,7 @@ const sections = computed<ViewSection[]>(() => {
     const resolved = resolveNode(d, node)
     return {
       key,
-      label: resolved.description ?? node.description ?? key,
+      label: localizedDescription(resolved, resolved.description ?? node.description ?? key),
       node,
     }
   })
@@ -113,10 +117,10 @@ const dirtyKeys = computed<Set<string>>(() => {
 const isDirty = computed(() => dirtyKeys.value.size > 0)
 
 const footerHint = computed(() => {
-  if (!baseline.value) return '设置尚未加载'
-  if (!isDirty.value) return '设置已是最新'
+  if (!baseline.value) return t('settings.notLoaded')
+  if (!isDirty.value) return t('settings.upToDate')
   const labels = sections.value.filter((s) => dirtyKeys.value.has(s.key)).map((s) => s.label)
-  return `有未保存的更改：${labels.join('、')}`
+  return t('settings.unsavedChanges', [labels.join('、')])
 })
 
 /* ---------- 滚动联动：点击导航定位 + 滚动时反向高亮导航项 ---------- */
@@ -159,7 +163,7 @@ async function load() {
     const spec = await fetchOpenApiSpec()
     const root = resolveNode(spec, { $ref: SETTINGS_REF })
     const entries = Object.entries(root.properties ?? {})
-    if (!entries.length) throw new Error('OpenAPI 规范中未找到 AppSettings 定义')
+    if (!entries.length) throw new Error(t('settings.schemaMissing'))
 
     for (const key of Object.keys(model)) delete model[key]
     for (const [key, node] of entries) {
@@ -207,9 +211,9 @@ async function save() {
   try {
     const updated = await updateSettings(partial)
     baseline.value = stableStringify(model)
-    ElMessage.success(updated.length ? `已更新 ${updated.length} 项设置` : '设置已保存')
+    ElMessage.success(updated.length ? t('settings.updated', [updated.length]) : t('settings.saved'))
   } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '保存设置失败')
+    ElMessage.error(err instanceof Error ? err.message : t('settings.saveFailed'))
   } finally {
     saving.value = false
   }

@@ -6,7 +6,7 @@
         <!-- 组标题条：仅前缀分组渲染，平铺字段无标题 -->
         <div v-if="section.prefix !== null" class="field-group-head">
           <span class="field-group-title">{{ groupTitle(section.prefix) }}</span>
-          <span class="field-group-count">{{ section.fields.length }} 项</span>
+          <span class="field-group-count">{{ section.fields.length }} {{ t('schema.fieldCountUnit') }}</span>
         </div>
 
         <template v-for="[key, node] in section.fields" :key="key">
@@ -21,7 +21,7 @@
           <div v-else-if="kindOf(node) === 'object'" class="field-block">
             <div class="field-titles">
               <div class="block-label">{{ displayKey(key, section.prefix) }}</div>
-              <div v-if="node.description" class="field-desc" :title="node.description">{{ node.description }}</div>
+              <div v-if="node.description" class="field-desc" :title="localizedDescription(node, node.description)">{{ localizedDescription(node, node.description) }}</div>
             </div>
             <SchemaForm :schema="node" :doc="doc" :model-value="recordValue()[key]" :baseline="baselineRecord()[key]"
               @update:model-value="setField(key, $event)" />
@@ -37,16 +37,20 @@
   </div>
 
   <!-- 叶子 schema：name / version 这类标量标签页直接渲染单控件 -->
-  <SchemaField v-else :field-key="fieldKey" :description="label ?? '值'" :node="schema" :doc="doc" :model-value="model"
+  <SchemaField v-else :field-key="fieldKey" :description="label ?? t('schema.valueLabel')" :node="schema" :doc="doc" :model-value="model"
     :dirty="isSelfDirty" @update:model-value="model = $event" />
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed } from 'vue'
 import type { OpenApiDocument, SchemaNode } from '@/utils/schemaForm'
-import { fieldKind, resolveNode, stableStringify } from '@/utils/schemaForm'
+import { fieldKind, localizedDescription, resolveNode, stableStringify } from '@/utils/schemaForm'
 import SchemaArrayEditor from './SchemaArrayEditor.vue'
 import SchemaField from './SchemaField.vue'
+
+const { t } = useI18n()
 
 // 递归 schema 表单：对象渲染字段集合，数组支持增删条目，$ref 由 resolveNode 解析
 defineOptions({ name: 'SchemaForm' })

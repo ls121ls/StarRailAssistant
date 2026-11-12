@@ -5,18 +5,21 @@ import sys
 
 sys.path.append(os.getcwd())  # 将当前工作目录添加到 sys.path，以便导入 tasks
 
-from SRACore.localization import Resource
-from SRACore.service.setting_service import SettingsService
+from SRACore.localization import Resources
+from SRACore.services.setting_service import SettingsService
 from SRACore.util.const import VERSION, AppDataDir, CacheDir, ConfigsDir, LogsDir, SettingsJson
+from SRACore.util.standard_io import configure_standard_streams
 
 
 def main():
-    settings_service = SettingsService()
-    language: int = settings_service.settings.Display.Language
-    Resource.set_language(language)
+    # Must precede argparse output and cmd2/Rich/logging stream capture.
+    configure_standard_streams()
+    settings = SettingsService()
+    language: int = settings.settings.Display.Language
+    Resources.set_language(language)
     parser = argparse.ArgumentParser(
-        description=Resource.argparse_description,
-        epilog=Resource.argparse_epilog,
+        description=Resources.argparse_description,
+        epilog=Resources.argparse_epilog,
         formatter_class=argparse.RawTextHelpFormatter
     )
     setup_argumentparser(parser)
@@ -29,12 +32,13 @@ def main():
         sys.argv.remove('--no-admin')  # 移除参数，不向下传递（无论是否已是管理员）
     if not is_admin():
         if args.no_admin:
-            print(Resource.cli_noAdminWarning)
+            print(Resources.cli_noAdminWarning)
         else:
             restart_as_admin()
-    from SRACore.util.logger import logger, setup_logger
-    # 设置日志记录器
-    setup_logger(level=args.log_level)
+    # 构造进程内宿主：统一负责日志、tasks/extensions 动态导入与任务/扩展编排
+    from SRACore.services import AppContext
+    context = AppContext(log_level=args.log_level)
+    from SRACore.util.logger import logger
     logger.info(f"Current version: {VERSION}")
     logger.debug(f"cwd: {os.getcwd()}")
 
@@ -49,10 +53,8 @@ def main():
     if args.inline:
         sys.argv.remove('--inline')
     # 延迟导入 SRACli
-    from SRACore.util import dynamic_import
-    dynamic_import("tasks")  # 动态导入 tasks 包下的所有模块
     from SRACore.cli2 import SRACli
-    cli_instance = SRACli(settings_service)
+    cli_instance = SRACli(context)
     # 配置交互式模式（隐藏提示符）
     if args.inline:
         cli_instance.intro = ''
@@ -64,31 +66,31 @@ def setup_argumentparser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         '--inline',
         action='store_true',
-        help=Resource.argparse_inline_help
+        help=Resources.argparse_inline_help
     )
     parser.add_argument(
         '--command', '-c', '--execute', '-e',
         nargs='*',
         type=str,
-        help='The command to execute AFTER launch',
+        help=Resources.cli_argHelp_command,
     )
     parser.add_argument(
         '-v', '--version',
         action='version',
         version=f'{VERSION}',
-        help=Resource.argparse_version_help
+        help=Resources.argparse_version_help
     )
     parser.add_argument(
         '--log-level',
         type=str,
         choices=['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL'],
         default='TRACE',
-        help=Resource.argparse_log_level_help
+        help=Resources.argparse_log_level_help
     )
     parser.add_argument(
         '--no-admin',
         action='store_true',
-        help="Do not require admin privileges"
+        help=Resources.cli_argHelp_noAdmin
     )
 
     parser.add_argument(
@@ -97,7 +99,7 @@ def setup_argumentparser(parser: argparse.ArgumentParser) -> None:
         nargs='?',
         default='',
         metavar=f'{{{",".join(subcommands.keys())}}}',
-        help="Subcommands, type '{subcommand} --help' for more information"
+        help=Resources.cli_argHelp_subcommand
     )
 
     parser.add_argument(
@@ -120,7 +122,7 @@ def where_parser() -> argparse.ArgumentParser:
     """返回路径查找解析器"""
     parser = argparse.ArgumentParser(
         prog=f'{os.path.basename(sys.argv[0])} where',
-        description='Find the path of the executable file or a directory',
+        description=Resources.cli_argHelp_whereDescription,
     )
     parser.add_argument(
         'path',
@@ -128,7 +130,7 @@ def where_parser() -> argparse.ArgumentParser:
         nargs='?',
         choices=['configs', 'logs', 'cache', 'data', 'settings', ''],
         default='',
-        help='The path to find',
+        help=Resources.cli_argHelp_wherePath,
     )
     return parser
 
@@ -153,29 +155,30 @@ def serve_parser() -> argparse.ArgumentParser:
     """返回服务器解析器"""
     parser = argparse.ArgumentParser(
         prog=f'{os.path.basename(sys.argv[0])} serve',
-        description='Start the SRA server',
+        description=Resources.cli_argHelp_serverDescription,
     )
     parser.add_argument(
         '--host',
         action='store_true',
-        help='Expose the server to the public network',
+        help=Resources.cli_argHelp_serverHost,
     )
     parser.add_argument(
         '--port',
         type=int,
-        default=5000,
-        help='The port to use',
+        default=None,
+        help=Resources.cli_argHelp_serverPort,
+    )
+    parser.add_argument(
+        '--no-webui',
+        action='store_true',
+        help=Resources.cli_argHelp_serverNoWebui,
     )
     return parser
 
 def serve(args: argparse.Namespace) -> bool:
-    """启动服务器"""
-    executable = "./SRA-server.exe" if sys.platform == 'win32' else "./SRA-server"
-    if args.host:
-        urls = f'http://0.0.0.0:{args.port}'
-    else:
-        urls = f'http://localhost:{args.port}'
-    subprocess.run([executable, f"--urls '{urls}'"], cwd=os.getcwd())
+    """启动服务端（与 ``sra-server`` 共用 ``SRAServer.run_server``，进程内运行）。"""
+    from SRAServer.__main__ import run_server
+    run_server(host=args.host, port=args.port, webui=False if args.no_webui else None)
     return True
 
 
@@ -193,11 +196,13 @@ def restart_as_admin():
         cmdline = subprocess.list2cmdline(sys.argv)
         executable = sys.executable.removesuffix('.exe')
         executable += '.exe'
-        result = ctypes.windll.shell32.ShellExecuteW(None, 'runas', 'wt.exe', f'"{executable}" {cmdline}', None, 1)
+        # 保留当前工作目录：源码分发模式下 main.py、tasks/ 与 resources/ 均按 cwd 解析
+        cwd = os.getcwd()
+        result = ctypes.windll.shell32.ShellExecuteW(None, 'runas', 'wt.exe', f'"{executable}" {cmdline}', cwd, 1)
         if result > 32:
             sys.exit(0)
         else:
-            result = ctypes.windll.shell32.ShellExecuteW(None, 'runas', executable, cmdline, None, 1)
+            result = ctypes.windll.shell32.ShellExecuteW(None, 'runas', executable, cmdline, cwd, 1)
             sys.exit(result)
 
 

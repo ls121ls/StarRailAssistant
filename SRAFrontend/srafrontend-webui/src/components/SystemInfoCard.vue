@@ -1,5 +1,5 @@
 <template>
-  <PanelCard title="系统信息" class="stack-card">
+  <PanelCard :title="t('system.title')" class="stack-card">
     <div v-if="loading" class="backend-loading">
       <el-skeleton animated :rows="3" />
     </div>
@@ -10,6 +10,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed, onMounted, ref } from 'vue'
 import { fetchSystemInfo, type AppSystemInfo } from '@/api/app'
 import PanelCard from './PanelCard.vue'
@@ -17,6 +19,8 @@ import WindowIcon from './icons/WindowIcon.vue'
 import ServerIcon from './icons/ServerIcon.vue'
 import WindowsIcon from './icons/WindowsIcon.vue'
 import DotnetIcon from './icons/DotnetIcon.vue'
+
+const { t } = useI18n()
 
 
 // __BUILD_INFO__ 由 vite.config.ts 在构建时经 define 注入（见 env.d.ts 类型声明）
@@ -41,10 +45,10 @@ const backendRows = computed(() => {
   const d = info.value
   if (!d) return []
   return [
-    { icon: WindowIcon, label: '前端版本', value: appVersion || '—' },
-    { icon: ServerIcon, label: '后端版本', value: d.version || '—' },
-    { icon: WindowsIcon, label: '操作系统', value: `${d.osVersion} / ${d.architecture}` },
-    { icon: DotnetIcon, label: '.NET 运行时', value: d.dotnetVersion || '—' },
+    { icon: WindowIcon, label: t('system.frontendVersion'), value: appVersion || '—' },
+    { icon: ServerIcon, label: t('system.backendVersion'), value: d.version || '—' },
+    { icon: WindowsIcon, label: t('system.os'), value: `${d.osVersion} / ${d.architecture}` },
+    { icon: DotnetIcon, label: t('system.dotnetRuntime'), value: d.dotnetVersion || '—' },
   ]
 })
 </script>

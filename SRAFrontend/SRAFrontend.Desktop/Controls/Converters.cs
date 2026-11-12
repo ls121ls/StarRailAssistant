@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
+using SRAFrontend.Localization;
 
 namespace SRAFrontend.Desktop.Controls;
 
@@ -43,7 +44,8 @@ public class DateToStringConverter : IValueConverter
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         if (value is DateTime dt)
-            return dt.ToString("yyyy年MM月dd日 dddd", new CultureInfo("zh-CN"));
+            // 格式串与格式化文化都跟随界面语言：ru-RU / en-US / zh-CN。
+            return dt.ToString(Resources.DateDisplayFormat, Resources.Culture ?? CultureInfo.CurrentUICulture);
         return "";
     }
 

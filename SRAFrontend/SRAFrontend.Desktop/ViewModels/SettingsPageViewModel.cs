@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -118,6 +117,23 @@ public partial class SettingsPageViewModel : PageViewModel
 
     private AppSettings Settings => _settingsService.Settings;
     public GeneralSettings GeneralSettings => Settings.General;
+
+    // 显示模式在配置里以中文值保存，展示文案按界面语言取资源。
+    private static readonly string[] FullScreenModeValues = ["窗口化", "全屏幕"];
+
+    public string[] FullScreenModeNames => [Resources.WindowedModeText, Resources.FullscreenModeText];
+
+    public int FullScreenModeIndex
+    {
+        get => Math.Max(0, Array.IndexOf(FullScreenModeValues, Settings.General.GameArgsFullScreenMode));
+        set
+        {
+            if (value >= 0 && value < FullScreenModeValues.Length)
+                Settings.General.GameArgsFullScreenMode = FullScreenModeValues[value];
+            OnPropertyChanged();
+        }
+    }
+
     public DisplaySettings DisplaySettings => Settings.Display;
     public NotificationSettings NotificationSettings => Settings.Notification;
     public UpdateSettings UpdateSettings => Settings.Update;
@@ -125,7 +141,14 @@ public partial class SettingsPageViewModel : PageViewModel
     public Cache Cache => _cacheService.Cache;
     public static string VersionText => AppSettings.Version;
     public string DeviceId => _reportService.GetDeviceId();
-    public bool IsLanguageNotChinese => DisplaySettings.Language != 0;
+    /// <summary>ComboBox 绑定用：对外仍是 0/1/2 的索引。</summary>
+    public int LanguageIndex
+    {
+        get => (int)DisplaySettings.Language;
+        set => DisplaySettings.Language = (UiLanguage)value;
+    }
+
+    public bool IsLanguageNotChinese => DisplaySettings.Language != UiLanguage.Chinese;
 
     public string GameChineseLanguageTip =>
         Resources.ResourceManager.GetString(nameof(GameChineseLanguageTip), Resources.Culture) ?? "";
@@ -227,7 +250,7 @@ public partial class SettingsPageViewModel : PageViewModel
             // 基础长度校验
             if (value.Length != 24)
             {
-                Cache.CdkStatus = "CDK长度错误，应为24位字符";
+                Cache.CdkStatus = Resources.CdkLengthError;
                 Cache.CdkStatusForeground = "#F5222D";
                 return;
             }
@@ -282,7 +305,7 @@ public partial class SettingsPageViewModel : PageViewModel
     {
         var cdk = MirrorChyanCdk;
         // 显示"验证中"状态
-        Cache.CdkStatus = "验证中...";
+        Cache.CdkStatus = Resources.VerifyingMessage;
         Cache.CdkStatusForeground = "#FAAD14"; // 黄色表示处理中
 
         // 执行异步验证
@@ -290,7 +313,7 @@ public partial class SettingsPageViewModel : PageViewModel
 
         if (response is null)
         {
-            Cache.CdkStatus = "验证失败，无法连接到验证服务";
+            Cache.CdkStatus = Resources.VerificationServiceError;
             Cache.CdkStatusForeground = "#F5222D"; // 红色表示错误
             return;
         }
@@ -298,7 +321,7 @@ public partial class SettingsPageViewModel : PageViewModel
         if (response.Code == 0)
         {
             var leastTime = DateTimeOffset.FromUnixTimeSeconds(response.Data.CdkExpiredTime);
-            Cache.CdkStatus = $"CDK有效 至: {leastTime:yyyy-MM-dd HH:mm:ss}";
+            Cache.CdkStatus = string.Format(Resources.Culture, Resources.CdkValidUntilFormat, leastTime);
             Cache.CdkStatusForeground = "#279F27"; // 绿色表示成功
         }
         else
@@ -349,29 +372,29 @@ public partial class SettingsPageViewModel : PageViewModel
             if (result.IsIntact)
             {
                 _commonModel.ShowSuccessToast(Resources.ResourceIntegrityCheckText,
-                    $"完整性检查通过，共校验 {result.TotalCount} 个文件");
+                    string.Format(Resources.Culture, Resources.IntegrityCheckPassedMessage, result.TotalCount));
                 return;
             }
 
             var problems = new StackPanel { Spacing = 8 };
-            AddProblemFiles(problems, "以下文件缺失", result.MissingFiles);
-            AddProblemFiles(problems, "以下文件校验失败（已损坏或版本不一致）", result.CorruptedFiles);
+            AddProblemFiles(problems, Resources.MissingFilesMessage, result.MissingFiles);
+            AddProblemFiles(problems, Resources.CorruptedFilesMessage, result.CorruptedFiles);
             await SukiMessageBox.ShowDialog(new SukiMessageBoxHost
             {
                 Header = Resources.ResourceIntegrityCheckText,
                 Content = new ScrollViewer { MaxHeight = 400, Content = problems },
                 ActionButtonsSource =
-                    [SukiMessageBoxButtonsFactory.CreateButton("知道了", SukiMessageBoxResult.Cancel)]
+                    [SukiMessageBoxButtonsFactory.CreateButton(Resources.GotItText, SukiMessageBoxResult.Cancel)]
             });
         }
         catch (FileNotFoundException)
         {
             _commonModel.ShowErrorToast(Resources.ResourceIntegrityCheckText,
-                "未找到完整性清单文件（manifest.md5.json），请通过应用内更新重新安装后再试");
+                Resources.IntegrityManifestMissingMessage);
         }
         catch (Exception e)
         {
-            _commonModel.ShowErrorToast(Resources.ResourceIntegrityCheckText, $"检查失败：{e.Message}");
+            _commonModel.ShowErrorToast(Resources.ResourceIntegrityCheckText, string.Format(Resources.Culture, Resources.CheckFailedError, e.Message));
         }
         finally
         {
@@ -385,7 +408,7 @@ public partial class SettingsPageViewModel : PageViewModel
         if (files.Count == 0) return;
         panel.Children.Add(new TextBlock
         {
-            Text = $"{header}（{files.Count} 个）",
+            Text = string.Format(Resources.Culture, Resources.FileCountFormat, header, files.Count),
             FontWeight = FontWeight.Bold
         });
         foreach (var file in files.Take(50))
@@ -393,7 +416,7 @@ public partial class SettingsPageViewModel : PageViewModel
         if (files.Count > 50)
             panel.Children.Add(new TextBlock
             {
-                Text = $"……其余 {files.Count - 50} 个文件省略",
+                Text = string.Format(Resources.Culture, Resources.OmittedFilesFormat, files.Count - 50),
                 FontSize = 12,
                 Opacity = 0.72
             });
@@ -414,7 +437,7 @@ public partial class SettingsPageViewModel : PageViewModel
             var redundant = await Task.Run(() => ZipUtil.ScanRedundantFiles(DataPath.AppRoot));
             if (redundant.Count == 0)
             {
-                _commonModel.ShowSuccessToast(Resources.ResourceCleanupText, "未发现可清理的文件");
+                _commonModel.ShowSuccessToast(Resources.ResourceCleanupText, Resources.NoFilesToCleanMessage);
                 return;
             }
 
@@ -426,8 +449,8 @@ public partial class SettingsPageViewModel : PageViewModel
                 Content = view,
                 ActionButtonsSource =
                 [
-                    SukiMessageBoxButtonsFactory.CreateButton("删除选中", SukiMessageBoxResult.Yes, "Flat"),
-                    SukiMessageBoxButtonsFactory.CreateButton("取消", SukiMessageBoxResult.Cancel)
+                    SukiMessageBoxButtonsFactory.CreateButton(Resources.DeleteSelectedText, SukiMessageBoxResult.Yes, "Flat"),
+                    SukiMessageBoxButtonsFactory.CreateButton(Resources.CancelText, SukiMessageBoxResult.Cancel)
                 ]
             });
             if (result is not SukiMessageBoxResult.Yes) return;
@@ -435,19 +458,21 @@ public partial class SettingsPageViewModel : PageViewModel
             var (deletedCount, freedBytes, failed) = await viewModel.DeleteSelectedAsync();
             if (failed.Count == 0)
                 _commonModel.ShowSuccessToast(Resources.ResourceCleanupText,
-                    $"已删除 {deletedCount} 个文件，释放 {ZipUtil.FormatFileSize(freedBytes)}");
+                    string.Format(Resources.Culture, Resources.FilesDeletedFormat, deletedCount, ZipUtil.FormatFileSize(freedBytes)));
             else
                 _commonModel.ShowErrorToast(Resources.ResourceCleanupText,
-                    $"已删除 {deletedCount} 个文件，{failed.Count} 个删除失败（可能被占用）：{string.Join("、", failed.Take(3))}{(failed.Count > 3 ? " 等" : "")}");
+                    string.Format(Resources.Culture, Resources.FilesDeletedWithFailuresMessage, deletedCount, failed.Count,
+                        string.Join(Resources.ListSeparatorText, failed.Take(3)),
+                        failed.Count > 3 ? Resources.MoreFilesSuffix : ""));
         }
         catch (FileNotFoundException)
         {
             _commonModel.ShowErrorToast(Resources.ResourceCleanupText,
-                "未找到完整性清单文件（manifest.md5.json），无法区分冗余文件，请通过应用内更新重新安装后再试");
+                Resources.RedundantManifestMissingMessage);
         }
         catch (Exception e)
         {
-            _commonModel.ShowErrorToast(Resources.ResourceCleanupText, $"扫描失败：{e.Message}");
+            _commonModel.ShowErrorToast(Resources.ResourceCleanupText, string.Format(Resources.Culture, Resources.ScanFailedError, e.Message));
         }
         finally
         {
@@ -471,7 +496,7 @@ public partial class SettingsPageViewModel : PageViewModel
         if (TopLevelObject is null) return;
         var folders = await TopLevelObject.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "选择下载文件的保存目录",
+            Title = Resources.DownloadFolderPickerTitle,
             AllowMultiple = false
         });
         if (folders.Count == 0) return;
@@ -485,9 +510,9 @@ public partial class SettingsPageViewModel : PageViewModel
         {
             await SukiMessageBox.ShowDialog(new SukiMessageBoxHost
             {
-                Header = "目录不可用",
-                Content = $"无法创建或访问所选目录：\n{path}\n请重新选择其他目录。",
-                ActionButtonsSource = [SukiMessageBoxButtonsFactory.CreateButton("知道了", SukiMessageBoxResult.Cancel)]
+                Header = Resources.FolderUnavailableMessage,
+                Content = string.Format(Resources.Culture, Resources.FolderAccessErrorMessage, path),
+                ActionButtonsSource = [SukiMessageBoxButtonsFactory.CreateButton(Resources.GotItText, SukiMessageBoxResult.Cancel)]
             });
             return;
         }
@@ -575,26 +600,28 @@ public partial class SettingsPageViewModel : PageViewModel
 
     private void OnLanguageChanged()
     {
-        Resources.Culture = new CultureInfo(DisplaySettings.Language == 0 ? "zh-CN" : "en-US");
+        _settingsService.Save();
         OnPropertyChanged(nameof(IsLanguageNotChinese));
+        OnPropertyChanged(nameof(LanguageIndex));
         OnPropertyChanged(nameof(GameChineseLanguageTip));
         _ = AskRestartAsync();
     }
 
     private async Task AskRestartAsync()
     {
-        var isChinese = DisplaySettings.Language == 0;
+        // 用户刚选了新语言，提示按新语言显示，而不是重启前的界面语言
+        var culture = App.CultureFor(DisplaySettings.Language);
+        string Localized(string name) => Resources.ResourceManager.GetString(name, culture) ?? name;
+
         var restartButton = SukiMessageBoxButtonsFactory.CreateButton(
-            isChinese ? "立即重启" : "Restart Now", SukiMessageBoxResult.Yes, "Flat");
+            Localized(nameof(Resources.RestartNowText)), SukiMessageBoxResult.Yes, "Flat");
         var laterButton = SukiMessageBoxButtonsFactory.CreateButton(
-            isChinese ? "稍后" : "Later", SukiMessageBoxResult.Cancel);
+            Localized(nameof(Resources.LaterText)), SukiMessageBoxResult.Cancel);
 
         var result = await SukiMessageBox.ShowDialog(new SukiMessageBoxHost
         {
-            Header = isChinese ? "语言已更改" : "Language Changed",
-            Content = isChinese
-                ? "需要重启应用以应用新语言，是否立即重启？"
-                : "The application needs to restart to apply the new language. Restart now?",
+            Header = Localized(nameof(Resources.LanguageChangedMessage)),
+            Content = Localized(nameof(Resources.LanguageRestartConfirmMessage)),
             ActionButtonsSource = [restartButton, laterButton]
         });
 
@@ -607,6 +634,7 @@ public partial class SettingsPageViewModel : PageViewModel
         var exePath = DataPath.SraExecutablePath;
         try
         {
+            _settingsService.Save();
             Process.Start(new ProcessStartInfo
             {
                 FileName = exePath,
@@ -617,10 +645,7 @@ public partial class SettingsPageViewModel : PageViewModel
         }
         catch (Exception e)
         {
-            var isChinese = DisplaySettings.Language == 0;
-            _commonModel.ShowErrorToast(
-                isChinese ? "重启失败" : "Restart Failed",
-                $"{(isChinese ? "发生错误" : "An error occurred")}：{e.Message}");
+            _commonModel.ShowErrorToast(Resources.RestartFailedError, e.Message);
         }
     }
 
@@ -628,128 +653,128 @@ public partial class SettingsPageViewModel : PageViewModel
     private async Task TestEmailAsync()
     {
         await SendTestNotificationAsync(
-            "邮件测试",
+            Resources.EmailTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.SmtpServer.Trim()) &&
                   Settings.Notification.SmtpPort > 0 &&
                   !string.IsNullOrEmpty(Settings.Notification.SmtpSender.Trim()) &&
                   !string.IsNullOrEmpty(Settings.Notification.SmtpAuthCode.Trim()) &&
                   !string.IsNullOrEmpty(Settings.Notification.SmtpReceiver.Trim()),
-            "请先完成 SMTP 相关设置",
+            Resources.SmtpSetupRequiredMessage,
             "notify test email",
-            "测试邮件已发送，请检查收件箱");
+            Resources.EmailTestSentMessage);
     }
 
     [RelayCommand]
     private async Task TestWebhookAsync()
     {
         await SendTestNotificationAsync(
-            "Webhook 测试",
+            Resources.WebhookTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.WebhookUrl.Trim()),
-            "请先填写 Webhook 地址",
+            Resources.WebhookUrlRequiredMessage,
             "notify test webhook",
-            $"测试请求已发送至：{Settings.Notification.WebhookUrl.Trim()}");
+            string.Format(Resources.Culture, Resources.WebhookTestSentMessage, Settings.Notification.WebhookUrl.Trim()));
     }
 
     [RelayCommand]
     private async Task TestTelegramAsync()
     {
         await SendTestNotificationAsync(
-            "Telegram 测试",
+            Resources.TelegramTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.TelegramBotToken.Trim()) &&
                   !string.IsNullOrEmpty(Settings.Notification.TelegramChatId.Trim()),
-            "请先填写 Bot Token 和 Chat ID",
+            Resources.TelegramCredentialsRequiredMessage,
             "notify test telegram",
-            "测试消息已发送，请检查 Telegram");
+            Resources.TelegramTestSentMessage);
     }
 
     [RelayCommand]
     private async Task TestServerChanAsync()
     {
         await SendTestNotificationAsync(
-            "ServerChan 测试",
+            Resources.ServerChanTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.ServerChanSendKey.Trim()),
-            "请先填写 SendKey",
+            Resources.SendKeyRequiredMessage,
             "notify test serverchan",
-            "测试消息已发送，请检查微信");
+            Resources.ServerChanTestSentMessage);
     }
 
     [RelayCommand]
     private async Task TestBarkAsync()
     {
         await SendTestNotificationAsync(
-            "Bark 测试",
+            Resources.BarkTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.BarkDeviceKey.Trim()),
-            "请先填写设备 Key",
+            Resources.BarkDeviceKeyRequiredMessage,
             "notify test bark",
-            "测试消息已发送，请检查 iPhone");
+            Resources.BarkTestSentMessage);
     }
 
     [RelayCommand]
     private async Task TestFeishuAsync()
     {
         await SendTestNotificationAsync(
-            "飞书测试",
+            Resources.FeishuTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.FeishuWebhookUrl.Trim()),
-            "请先填写 Webhook 地址",
+            Resources.WebhookUrlRequiredMessage,
             "notify test feishu",
-            "测试消息已发送，请检查飞书");
+            Resources.FeishuTestSentMessage);
     }
 
     [RelayCommand]
     private async Task TestWeComAsync()
     {
         await SendTestNotificationAsync(
-            "企业微信测试",
+            Resources.WeComTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.WeComWebhookUrl.Trim()),
-            "请先填写 Webhook 地址",
+            Resources.WebhookUrlRequiredMessage,
             "notify test wecom",
-            "测试消息已发送，请检查企业微信");
+            Resources.WeComTestSentMessage);
     }
 
     [RelayCommand]
     private async Task TestDingTalkAsync()
     {
         await SendTestNotificationAsync(
-            "钉钉测试",
+            Resources.DingTalkTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.DingTalkWebhookUrl.Trim()),
-            "请先填写 Webhook 地址",
+            Resources.WebhookUrlRequiredMessage,
             "notify test dingtalk",
-            "测试消息已发送，请检查钉钉");
+            Resources.DingTalkTestSentMessage);
     }
 
     [RelayCommand]
     private async Task TestDiscordAsync()
     {
         await SendTestNotificationAsync(
-            "Discord 测试",
+            Resources.DiscordTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.DiscordWebhookUrl.Trim()),
-            "请先填写 Webhook 地址",
+            Resources.WebhookUrlRequiredMessage,
             "notify test discord",
-            "测试消息已发送，请检查 Discord");
+            Resources.DiscordTestSentMessage);
     }
 
     [RelayCommand]
     private async Task TestXxtuiAsync()
     {
         await SendTestNotificationAsync(
-            "xxtui 测试",
+            Resources.XxtuiTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.XxtuiApiKey.Trim()),
-            "请先填写 API Key",
+            Resources.XxtuiApiKeyRequiredMessage,
             "notify test xxtui",
-            "测试消息已发送");
+            Resources.TestMessageSentMessage);
     }
 
     [RelayCommand]
     private async Task TestOneBotAsync()
     {
         await SendTestNotificationAsync(
-            "OneBot 测试",
+            Resources.OneBotTestText,
             () => !string.IsNullOrEmpty(Settings.Notification.OneBotUrl.Trim()) &&
                   (!string.IsNullOrEmpty(Settings.Notification.OneBotUserId.Trim()) ||
                    !string.IsNullOrEmpty(Settings.Notification.OneBotGroupId.Trim())),
-            "请填写 API 地址以及 QQ 号或群号（至少一个）",
+            Resources.OneBotTargetRequiredMessage,
             "notify test onebot",
-            "测试消息已发送，请检查 QQ");
+            Resources.OneBotTestSentMessage);
     }
 
     /// <summary>
@@ -802,7 +827,7 @@ public partial class SettingsPageViewModel : PageViewModel
         if (_versionClickCount < VersionClickRequiredCount)
         {
             if (_versionClickCount > 3)
-                _commonModel.ShowInfoToast("开发者模式", Settings.Advanced.IsDeveloperModeEnabled ? "您正处于开发者模式！" : $"只需再执行 {VersionClickRequiredCount - _versionClickCount} 次操作，即可进入开发者模式。");
+                _commonModel.ShowInfoToast(Resources.DeveloperModeText, Settings.Advanced.IsDeveloperModeEnabled ? Resources.DeveloperModeActiveMessage : string.Format(Resources.Culture, Resources.DeveloperModeCountdownFormat, VersionClickRequiredCount - _versionClickCount));
             return;
         }
 
@@ -810,7 +835,7 @@ public partial class SettingsPageViewModel : PageViewModel
 
         // 只负责开启开发者模式，关闭仍然通过显式开关
         if (!Settings.Advanced.IsDeveloperModeEnabled) Settings.Advanced.IsDeveloperModeEnabled = true;
-        _commonModel.ShowInfoToast("开发者模式", "您正处于开发者模式！");
+        _commonModel.ShowInfoToast(Resources.DeveloperModeText, Resources.DeveloperModeActiveMessage);
     }
 
     #endregion

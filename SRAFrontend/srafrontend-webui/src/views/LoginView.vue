@@ -16,7 +16,7 @@
         @submit.prevent="handleSubmit">
         <el-form-item label="Access Token" prop="token">
           <el-input v-model="form.token" type="password" size="large" show-password :prefix-icon="Key"
-            placeholder="请输入 Access Token" autocomplete="current-password" :disabled="submitting" />
+            :placeholder="t('login.tokenPlaceholder')" autocomplete="current-password" :disabled="submitting" />
         </el-form-item>
 
         <p class="login-hint">{{ hintText }}</p>
@@ -24,7 +24,7 @@
         <el-alert v-if="error" class="login-error" :title="error" type="error" show-icon :closable="false" />
 
         <el-button class="login-submit" type="primary" size="large" native-type="submit" :loading="submitting">
-          {{ submitting ? '正在验证…' : '进入' }}
+          {{ submitting ? t('login.verifying') : t('login.submit') }}
         </el-button>
       </el-form>
     </section>
@@ -32,6 +32,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { Key } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -41,17 +43,19 @@ import siteConfig from '@/configs/siteConfig'
 import { verifyToken } from '@/api/auth'
 import { setStoredToken } from '@/api/http'
 
+const { t } = useI18n()
+
 const router = useRouter()
 const route = useRoute()
 
 // 演示模式提示文案：__IS_DEMO__ 为 define 注入的编译期常量，
 // 正式构建下三元折叠为正式文案，演示提示不进正式产物
 const descText = __IS_DEMO__
-  ? '演示模式：输入任意 Access Token 即可进入'
-  : '该实例已启用访问认证，请输入 Access Token 继续'
+  ? t('login.demoHint')
+  : t('login.authHint')
 const hintText = __IS_DEMO__
-  ? '演示环境不校验 Token 内容，任意非空文本均可通过'
-  : '请查看您的后端服务配置，获取 Access Token 后输入'
+  ? t('login.demoNote')
+  : t('login.authNote')
 
 const formRef = ref<FormInstance>()
 const form = ref({ token: '' })
@@ -64,13 +68,13 @@ const bgFailed = ref(false)
 // 基本格式校验：必填、不含空白字符、长度上限
 const rules: FormRules<typeof form> = {
   token: [
-    { required: true, message: '请输入 access token', trigger: 'blur' },
+    { required: true, message: t('login.tokenRequired'), trigger: 'blur' },
     {
       validator: (_rule, value: string, callback) => {
         const token = (value ?? '').trim()
-        if (!token) return callback(new Error('请输入 access token'))
-        if (/\s/.test(token)) return callback(new Error('access token 不能包含空格'))
-        if (token.length > 512) return callback(new Error('access token 长度不能超过 512 位'))
+        if (!token) return callback(new Error(t('login.tokenRequired')))
+        if (/\s/.test(token)) return callback(new Error(t('login.tokenNoSpaces')))
+        if (token.length > 512) return callback(new Error(t('login.tokenTooLong')))
         callback()
       },
       trigger: 'blur',
@@ -85,7 +89,7 @@ function redirectTarget(): string {
   return '/'
 }
 
-/** 提交：表单校验通过后请求 /api/Auth 校验 token，成功则保存并进入主界面 */
+/** 提交：表单校验通过后请求 /api/auth 校验 token，成功则保存并进入主界面 */
 async function handleSubmit() {
   if (submitting.value || !formRef.value) return
   error.value = ''
@@ -98,10 +102,10 @@ async function handleSubmit() {
     const token = form.value.token.trim()
     await verifyToken(token)
     setStoredToken(token)
-    ElMessage.success('验证通过')
+    ElMessage.success(t('login.success'))
     await router.replace(redirectTarget())
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '验证失败，请稍后重试'
+    error.value = err instanceof Error ? err.message : t('login.failed')
   } finally {
     submitting.value = false
   }

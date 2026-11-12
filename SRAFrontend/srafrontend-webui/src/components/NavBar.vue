@@ -39,7 +39,7 @@
         <ThemeHuePicker />
 
         <!-- 深色模式切换 -->
-        <button class="theme-toggle" :aria-label="isDark ? '切换到浅色模式' : '切换到深色模式'" @click="toggleTheme($event)">
+        <button class="theme-toggle" :aria-label="isDark ? t('nav.toLight') : t('nav.toDark')" @click="toggleTheme($event)">
           <svg v-if="isDark" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
             stroke-width="2" stroke-linecap="round">
             <circle cx="12" cy="12" r="4" />
@@ -53,7 +53,7 @@
         </button>
 
         <!-- 移动端汉堡按钮 -->
-        <button class="hamburger" :class="{ open: menuOpen }" aria-label="切换菜单" @click="menuOpen = !menuOpen">
+        <button class="hamburger" :class="{ open: menuOpen }" :aria-label="t('nav.toggleMenu')" @click="menuOpen = !menuOpen">
           <span></span><span></span><span></span>
         </button>
       </div>
@@ -73,16 +73,20 @@
 </template>
 
 <script lang="ts" setup>
+import { useI18n } from 'vue-i18n'
+
 import { computed, nextTick, ref } from 'vue'
 import { useDark, useToggle, useWindowScroll } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import siteConfig from '@/configs/siteConfig'
 import ThemeHuePicker from './ThemeHuePicker.vue'
 
+const { t } = useI18n()
+
 const router = useRouter()
 // 演示模式徽标文案：__IS_DEMO__ 为 define 注入的编译期常量，
 // 正式构建下三元被折叠为空串，分支与文案一并被消除
-const demoBadge = __IS_DEMO__ ? '演示模式' : ''
+const demoBadge = __IS_DEMO__ ? t('nav.demoBadge') : ''
 const status = ref('online')
 const menuOpen = ref(false)
 
@@ -142,7 +146,7 @@ const routes = router
   .filter((item) => !item.meta.hideInNav)
   .map((item) => ({
     path: item.path,
-    name: item.name,
+    name: item.meta.title ?? item.name,
     icon: item.meta.icon,
   }))
 </script>
@@ -179,6 +183,9 @@ html.dark .nav-bar {
 
 /* ---------- 覆盖在 Hero 之上：全透明 + 白色文字 ---------- */
 .nav-bar.over-hero {
+  /* over-hero 的图标基色用变量承载，供 .theme-toggle / .hue-toggle 的 color 取值；
+     直接声明 color 会以更高优先级盖掉子组件的 :hover */
+  --nav-icon-color: #fff;
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -210,7 +217,6 @@ html.dark .nav-bar {
 
 .nav-bar.over-hero .theme-toggle,
 .nav-bar.over-hero :deep(.hue-toggle) {
-  color: #fff;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
@@ -378,7 +384,7 @@ html.dark .nav-bar {
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--color-text);
+  color: var(--nav-icon-color, var(--color-text));
   cursor: pointer;
   transition:
     background-color 0.2s,
@@ -470,7 +476,33 @@ html.dark .nav-bar {
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 768px) {
+  .nav-inner {
+    gap: 8px;
+    padding: 0 12px;
+  }
+
+  .nav-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .nav-title {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .nav-center {
+    display: none;
+  }
+
+  .nav-right {
+    flex-shrink: 0;
+    gap: 6px;
+  }
+
+  .user-info {
     display: none;
   }
 
@@ -478,8 +510,19 @@ html.dark .nav-bar {
     display: none;
   }
 
+  .theme-toggle,
+  :deep(.hue-toggle) {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+  }
+
   .hamburger {
     display: flex;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    padding: 7px;
   }
 }
 </style>

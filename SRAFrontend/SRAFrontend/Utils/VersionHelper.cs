@@ -1,3 +1,4 @@
+using SRAFrontend.Localization;
 ﻿namespace SRAFrontend.Utils;
 
 public static class VersionHelper
@@ -49,9 +50,9 @@ public static class VersionHelper
     /// </summary>
     public static string GetVersionDisplayText(SemVerInfo currentVersion, SemVerInfo? installedHotfixVersion)
     {
-        if (installedHotfixVersion == null) return $"当前版本：{currentVersion}";
+        if (installedHotfixVersion == null) return string.Format(Resources.Culture, Resources.CurrentVersionFormat, currentVersion);
         return currentVersion > installedHotfixVersion
-            ? $"当前版本：{currentVersion}"
-            : $"热修复：{installedHotfixVersion}";
+            ? string.Format(Resources.Culture, Resources.CurrentVersionFormat, currentVersion)
+            : string.Format(Resources.Culture, Resources.HotfixFormat, installedHotfixVersion);
     }
 }

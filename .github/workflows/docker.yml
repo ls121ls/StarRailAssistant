@@ -1,0 +1,217 @@
+#   <StarRailAssistant:An automated program that helps you complete daily tasks of StarRail.>
+#   Copyright © <2024> <Shasnow>
+
+#   This file is part of StarRailAssistant.
+
+#   StarRailAssistant is free software: you can redistribute it and/or modify it
+#   under the terms of the GNU Affero General Public License as published by the Free Software Foundation,
+#   either version 3 of the License, or (at your option) any later version.
+
+#   StarRailAssistant is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+#   without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#   See the GNU Affero General Public License for more details.
+
+#   You should have received a copy of the GNU Affero General Public License along with StarRailAssistant.
+#   If not, see <https://www.gnu.org/licenses/>.
+
+#   yukikage@qq.com
+
+name: Build Docker Image
+
+# 构建服务端镜像，先冒烟测试，全部通过后推送到 GHCR（ghcr.io/<owner>/starrailassistant）。
+# 镜像内容全部来自本次修订版本（WebUI 由 Dockerfile 的阶段 1 现场构建），启动不需要联网。
+#
+# 标签规则：sha-<短哈希> 每次都有；main 分支与 v* 发布 tag 上额外打 v<版本号> 与通道标签
+# （正式版 :latest，版本号含 "-" 的 beta 版 :beta，对齐 package.py 区分正式版/beta 的做法）。
+on:
+  workflow_dispatch:
+  # 发布流程会自动出镜像：python-app.yml 用 secrets.WORKFLOW_TOKEN（PAT）执行 gh release create，
+  # 由此产生的 v* tag 会触发本工作流。前提是 PAT——若换成默认 GITHUB_TOKEN 创建 tag/release，
+  # GitHub 不会触发其它工作流，届时需改为在发布流程里显式 gh workflow run。
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build Server Image
+    runs-on: ubuntu-latest
+    env:
+      LOCAL_TAG: sra-server:ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # compose 文件不参与镜像构建，单独校验语法：否则 compose 写错了要等到部署时才发现
+      - name: 校验 docker-compose.yml
+        run: docker compose config -q
+
+      - name: 解析版本与镜像名
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p 'require("./package.json").version')
+          if [[ "$VERSION" == *-* ]]; then CHANNEL=beta; else CHANNEL=stable; fi
+          # 版本号/通道标签只在 main 与 v* 发布 tag 上打，避免任意分支的构建覆盖正式标签
+          if [[ "$GITHUB_REF" == refs/heads/main || "$GITHUB_REF" == refs/tags/v* ]]; then
+            PUBLISH_LANE=true
+          else
+            PUBLISH_LANE=false
+          fi
+          # GHCR 要求仓库名全小写，GITHUB_REPOSITORY 含大写所有者名，这里统一转小写
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "publish_lane=$PUBLISH_LANE" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: 生成镜像标签
+        id: tags
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.meta.outputs.image }}
+          tags: |
+            type=sha,format=short
+            type=raw,value=v${{ steps.meta.outputs.version }},enable=${{ steps.meta.outputs.publish_lane == 'true' }}
+            type=raw,value=latest,enable=${{ steps.meta.outputs.publish_lane == 'true' && steps.meta.outputs.channel == 'stable' }}
+            type=raw,value=beta,enable=${{ steps.meta.outputs.publish_lane == 'true' && steps.meta.outputs.channel == 'beta' }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # load 而非 push：先落到本地 daemon 供后续验证，验证通过后再统一推送
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: |
+            ${{ steps.tags.outputs.tags }}
+            ${{ env.LOCAL_TAG }}
+          labels: ${{ steps.tags.outputs.labels }}
+          # 构建缓存：pip / pnpm 下载与 apt 安装是主要耗时，命中缓存后可显著缩短
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 镜像信息
+        run: docker images "${{ env.LOCAL_TAG }}" --format '{{.Repository}}:{{.Tag}}  {{.Size}}'
+
+      # 同时验证：服务端能起来、WebUI 静态资源被托管、tasks/ 与 extensions/ 确实进了镜像
+      # 两个坑：`cmd | grep -q` 在 set -o pipefail 下会因 grep 提前退出触发上游 SIGPIPE
+      # 而把整条管道判为失败；容器 stdout 落到 docker 日志驱动也有极短延迟。
+      # 因此校验一律先落盘再 grep，并对日志断言轮询重试。
+      - name: 服务端冒烟测试
+        run: |
+          set -euo pipefail
+          # 令牌留空 = 关闭 /api 鉴权，冒烟测试无需带令牌
+          docker run -d --name sra-smoke -p 5073:5073 -e SRA_ACCESS_TOKEN= "${{ env.LOCAL_TAG }}"
+
+          ready=false
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:5073/openapi/v1.json; then ready=true; break; fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then
+            echo "::error::服务端未在 120s 内就绪"
+            docker logs sra-smoke > "$RUNNER_TEMP/smoke.log" 2>&1 || true
+            tail -n 100 "$RUNNER_TEMP/smoke.log"
+            exit 1
+          fi
+
+          # 容器 stdout 落到 docker 日志驱动有极短延迟，这里轮询等日志齐了再判定
+          for _ in $(seq 1 10); do
+            docker logs sra-smoke > "$RUNNER_TEMP/smoke.log" 2>&1 || true
+            grep -q 'Successfully load task' "$RUNNER_TEMP/smoke.log" && break
+            sleep 1
+          done
+
+          # WebUI 静态资源
+          curl -fsS http://127.0.0.1:5073/ -o "$RUNNER_TEMP/index.html"
+          grep -q '<div id="app"' "$RUNNER_TEMP/index.html" || {
+            echo "::error::WebUI 静态资源未托管（SRAServer/static 是否由阶段 1 正确 COPY？）"
+            exit 1
+          }
+
+          # 扩展注册
+          curl -fsS http://127.0.0.1:5073/api/extensions -o "$RUNNER_TEMP/extensions.json"
+          grep -q 'AutoPlot' "$RUNNER_TEMP/extensions.json" || {
+            echo "::error::扩展未注册（extensions/ 是否进入镜像？）"
+            exit 1
+          }
+
+          # 首次启动应已由入口脚本预置云游戏设置（浏览器/路径/无头）
+          curl -fsS http://127.0.0.1:5073/api/settings -o "$RUNNER_TEMP/settings.json"
+          python3 - "$RUNNER_TEMP/settings.json" <<'PY'
+          import json, sys
+
+          general = json.load(open(sys.argv[1], encoding="utf-8"))["data"]["general"]
+          expected = {
+              "cloudGame.enabled": True,
+              "cloudGame.browser": "Chrome for Testing",
+              "cloudGame.browser.path": "/usr/local/bin/chromium-container",
+              "cloudGame.browser.headless": True,
+          }
+          wrong = {k: general.get(k) for k, v in expected.items() if general.get(k) != v}
+          assert not wrong, f"容器默认设置未生效: {wrong}"
+          print("容器默认设置已生效:", expected)
+          PY
+
+          # 任务加载
+          grep -q 'Successfully load task' "$RUNNER_TEMP/smoke.log" || {
+            echo "::error::任务未加载（tasks/ 是否进入镜像？）"
+            tail -n 60 "$RUNNER_TEMP/smoke.log"
+            exit 1
+          }
+
+          echo "--- 容器日志（尾部）---"
+          tail -n 30 "$RUNNER_TEMP/smoke.log"
+
+      - name: 打印容器日志（失败时）
+        if: failure()
+        run: docker logs sra-smoke 2>&1 | tail -n 100 || true
+
+      - name: 清理容器
+        if: always()
+        run: docker rm -f sra-smoke || true
+
+      # 直接驱动容器内的 Chromium，验证云游戏这条链路可用；
+      # binary_location 指向镜像内的包装脚本（负责补 --no-sandbox / --disable-dev-shm-usage）
+      - name: 云游戏浏览器自检（无头 Chromium + Selenium）
+        run: |
+          docker run --rm -i --entrypoint python "${{ env.LOCAL_TAG }}" - <<'PY'
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+
+          options = Options()
+          options.binary_location = "/usr/local/bin/chromium-container"
+          options.add_argument("--headless")
+          options.add_argument("--user-data-dir=/tmp/selenium_profile")
+
+          driver = webdriver.Chrome(options=options)
+          driver.get("about:blank")
+          print("Selenium + Chromium OK, browserVersion =", driver.capabilities.get("browserVersion"))
+          driver.quit()
+          PY
+
+      # 只有以上验证全部通过才会走到这里（前序步骤失败时后续步骤默认跳过）
+      - name: 推送到 GHCR
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          TAGS: ${{ steps.tags.outputs.tags }}
+        run: |
+          set -euo pipefail
+          docker push --all-tags "$IMAGE"
+          echo "已推送到 $IMAGE："
+          echo "$TAGS"
+          echo "提示：本仓库为公开仓库，镜像可匿名拉取；如需限制，请在仓库的 Packages 设置页改为私有。"

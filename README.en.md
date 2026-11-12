@@ -1,4 +1,4 @@
-<p align="center"><img src="/resources/SRAico.png" alt="icon"></p>
+<p align="center"><img src="/assets/SRAico.png" alt="icon"></p>
 <p align="center">
     <img src="https://img.shields.io/badge/platform-Windows-blue" alt="platform">
     <img alt="Static Badge" src="https://img.shields.io/badge/python-3.12-skyblue">
@@ -12,7 +12,7 @@
       <img alt="PyPI Version" src="https://img.shields.io/pypi/v/starrailassistant">
     </a>
 </p>
-<p align="center"><a href="https://starrailassistant.top"><b>Homepage</b></a> | <a href="README.md"><b>中文</b></a></p>
+<p align="center"><a href="https://starrailassistant.top"><b>Homepage</b></a> | <a href="README.ru.md"><b>Русский</b></a> | <a href="README.en.md"><b>English</b></a> | <a href="README.md"><b>中文</b></a></p>
 
 #### [Troubleshooting](https://starrailassistant.top/getting-started/trouble-shooting/) | [FAQ](https://starrailassistant.top/getting-started/faq/) | [Download & Install](https://starrailassistant.top/getting-started/download/) | [Getting Started](https://starrailassistant.top/getting-started/getting-started/)
 

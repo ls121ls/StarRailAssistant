@@ -1,5 +1,5 @@
 <template>
-  <PanelCard title="构建环境" class="build-card">
+  <PanelCard :title="t('buildEnv.title')" class="build-card">
     <div class="build-grid">
       <DataCard
         v-for="row in rows"
@@ -14,6 +14,8 @@
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
 import { computed } from 'vue'
 import type { Component } from 'vue'
 import NodeLogoIcon from './icons/NodeLogoIcon.vue'
@@ -21,6 +23,8 @@ import PanelCard from './PanelCard.vue'
 import PnpmLogoIcon from './icons/PnpmLogoIcon.vue'
 import TypescriptLogoIcon from './icons/TypescriptLogoIcon.vue'
 import ViteLogoIcon from './icons/ViteLogoIcon.vue'
+
+const { t } = useI18n()
 
 interface BuildRow {
   icon: Component
@@ -37,13 +41,13 @@ const rows = computed<BuildRow[]>(() => [
     icon: NodeLogoIcon,
     label: 'Node.js',
     value: build.node,
-    hint: `要求 ${build.nodeRequired}`,
+    hint: t('buildEnv.required', [build.nodeRequired]),
   },
   {
     icon: PnpmLogoIcon,
     label: 'pnpm',
     value: build.pnpm || build.pnpmRequired,
-    hint: build.pnpm ? `要求 ${build.pnpmRequired}` : '取自 packageManager 声明',
+    hint: build.pnpm ? t('buildEnv.required', [build.pnpmRequired]) : t('buildEnv.fromPackageManager'),
   },
   {
     icon: ViteLogoIcon,
