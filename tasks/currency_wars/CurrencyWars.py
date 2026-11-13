@@ -1,6 +1,7 @@
 import enum
 import json
 import re
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -36,7 +37,6 @@ MAX_EQUIPMENT_PER_CHARACTER = 3
 
 class StageName(enum.StrEnum):
     """关卡阶段名称枚举"""
-    FORTUNE_TELLER = '命运卜者'
     REPLENISH_STAGE = '补给阶段'
     ENCOUNTER_NODE = '遭遇节点'
     FOLD = '无'
@@ -44,38 +44,51 @@ class StageName(enum.StrEnum):
     CLICK_BLANK = '点击空白处关闭'
     GAME_OVER = '游戏结束'
     MAIN_MENU = '主界面'
+    SELECT_EQUIPMENT = '选择装备'
 
 
-def _merge_ocr_text(fragments: list[tuple[list[tuple[int, int]], str, float]]) -> str:
-    """按文本框坐标拼接 OCR 片段，去掉检测框重叠处被重复识别的字。
+
+def _merge_ocr_lines(fragments: list[tuple[list[tuple[int, int]], str, float]]) -> list[str]:
+    """按文本框坐标把 OCR 片段拼成文本行，去掉检测框重叠处被重复识别的字。
 
     RapidOCR 有时会把同一行文本切成多个互相重叠的文本框（例如“知更鸟·晴歌”被切成
-    “知更鸟”和“鸟·晴歌”），直接按顺序拼接会多出重叠的字。这里按片段的横向范围与
-    字符平均宽度估算重叠的字数，只保留新出现的部分；换行产生的片段（纵向几乎不重叠）
-    仍按顺序直接拼接。
+    “知更鸟”和“鸟·晴歌”），直接按顺序拼接会多出重叠的字。这里按片段的横向重叠范围
+    估算可重复字数上限，再比对文本实际重复的前缀（检测框边界不精确，且“·”等窄字符
+    会拉偏平均字宽，所以只按几何估算会误删有效字符）；纵向不重叠的片段视为新的一行。
     """
     ordered = sorted(fragments, key=lambda item: (min(p[1] for p in item[0]), min(p[0] for p in item[0])))
-    text = ''
+    lines: list[str] = []
     line_right = line_top = line_bottom = 0
     for points, fragment, _ in ordered:
         left = min(point[0] for point in points)
         right = max(point[0] for point in points)
         top = min(point[1] for point in points)
         bottom = max(point[1] for point in points)
-        same_line = bool(text) and top < line_bottom and bottom > line_top
-        if same_line and left < line_right:
-            char_width = (right - left) / len(fragment) if fragment else 0
-            if char_width > 0:
-                overlap_chars = int(round((line_right - left) / char_width))
-                fragment = fragment[min(overlap_chars, len(fragment)):]
+        same_line = bool(lines) and top < line_bottom and bottom > line_top
         if same_line:
+            text = lines[-1]
+            if left < line_right:
+                char_width = (right - left) / len(fragment) if fragment else 0
+                if char_width > 0:
+                    # 几何重叠字数只作为上限（再多容一个字符），实际去掉多少由重复文本决定
+                    limit = min(int(round((line_right - left) / char_width)) + 1, len(fragment), len(text))
+                    for k in range(limit, 0, -1):
+                        if fragment[:k] == text[-k:]:
+                            fragment = fragment[k:]
+                            break
+            lines[-1] = text + fragment
             line_right = max(line_right, right)
             line_top = min(line_top, top)
             line_bottom = max(line_bottom, bottom)
         else:
+            lines.append(fragment)
             line_right, line_top, line_bottom = right, top, bottom
-        text += fragment
-    return text
+    return lines
+
+
+def _merge_ocr_text(fragments: list[tuple[list[tuple[int, int]], str, float]]) -> str:
+    """按文本框坐标拼接 OCR 片段（多行直接相连），去掉重叠处被重复识别的字。"""
+    return ''.join(_merge_ocr_lines(fragments))
 
 
 class CurrencyWars(Executable):
@@ -88,9 +101,9 @@ class CurrencyWars(Executable):
             "盛会之星": ("盛会之星", self.handle_the_planet_of_festivities),
             "命运圣杯": ("祈愿试炼", self.handle_wish_trial),
             "头号玩家": ("我来当策划", self.handle_silver_wolf_lv999),
-            "命运卜者": ("命运卜者", self.handle_fortune_teller),
             "开拓银轨": ("开拓商店", self.handle_trailblaze_store),
-            "奇兽花园": ("奇兽花园", self.handle_beast_garden)
+            "奇兽花园": ("奇兽花园", self.handle_beast_garden),
+            "梦境交织": ("梦境交织", self.handle_dream_interference)
         }
         self.is_continue = False  # 是否是继续挑战
         self.is_game_over = False
@@ -376,7 +389,9 @@ class CurrencyWars(Executable):
             return False
 
         # 5. 处理投资环境
-        return self._handle_invest_environment_flow()
+        self._handle_invest_environment_flow()
+        self.operator.sleep(8)  # 等待开局补给
+        return True
 
     def _select_difficulty(self) -> None:
         """难度选择逻辑（抽离后更易维护）"""
@@ -418,7 +433,7 @@ class CurrencyWars(Executable):
             logger.error("[Boss信息] 点击下一步按钮失败")
             return False
         # 点击空白处
-        self.operator.click_point(0.5, 0.5, after_sleep=0.5, tag="点击空白处")
+        self.operator.click_point(0.6, 0.5, after_sleep=0.5, tag="点击空白处")
         return True
 
     def _handle_invest_environment_flow(self) -> bool:
@@ -431,7 +446,6 @@ class CurrencyWars(Executable):
         # 有些情况下点击投资环境界面后会再次弹出投资环境界面，需要再次处理
         if self.operator.locate(CWIMG.INVEST_ENVIRONMENT):
             self.handle_invest_environment()
-        self.operator.sleep(4)
         return True
 
     # ==================== 继续进度进入逻辑（重构后） ====================
@@ -573,6 +587,7 @@ class CurrencyWars(Executable):
                     self.sort_all_areas_by_priority()  # 优先级排序
                     continue
                 break
+            self.handle_special_event()
             if not self.stage_transition():
                 break
             if self.is_game_over:  # 任务已被标记为停止, 需要退出循环
@@ -783,7 +798,7 @@ class CurrencyWars(Executable):
             return len(valid_boxes)
 
         # 角色名称OCR区域
-        ocr_from_x, ocr_from_y, ocr_to_x, ocr_to_y = (0.775, 0.175, 0.880, 0.2315)
+        ocr_from_x, ocr_from_y, ocr_to_x, ocr_to_y = (0.775, 0.185, 0.880, 0.258)
 
         for index, area in enumerate(areas):
             try:
@@ -814,11 +829,21 @@ class CurrencyWars(Executable):
                     )
 
                 # 更新角色列表
-                if character_names and len(character_names) > 0:
-                    # OCR 可能把同一行名字切成多个重叠的文本框，按坐标去重后再拼接
-                    name = _merge_ocr_text(character_names)
-                    char = Characters.get_character(name)
+                # 空位背景常被误识别为“1”等数字/符号，只保留包含文字的片段
+                fragments = [item for item in character_names or () if re.search(r"[^\W\d_]", item[1])]
+                if fragments:
+                    # OCR 可能把名字切成多个重叠的文本框，也可能把下方标签一起识别进来：
+                    # 逐行累加，优先采用能匹配角色表的组合（如“银狼LV.999”而不是“银狼LV.999前台”）
+                    lines = _merge_ocr_lines(fragments)
+                    name, char = '', None
+                    for i in range(len(lines)):
+                        candidate = ''.join(lines[:i + 1])
+                        char = Characters.get_character(candidate)
+                        if char is not None:
+                            name = candidate
+                            break
                     if char is None:
+                        name = ''.join(lines)
                         logger.warning(f"OCR识别到角色名称：{name}，但未在角色列表中找到匹配项")
                         target_character_list[index] = Characters.new_character(name)  # 新增临时角色
                         self.operator.click_point(0.5, 0.5, trace=False)  # 关闭信息框，避免影响下一个槽位
@@ -959,59 +984,79 @@ class CurrencyWars(Executable):
         logger.info("出售操作完成")
 
     def battle(self) -> bool:
-        index, box = self.operator.wait_ocr_any(["出战", "跳过", "幕后茶歇", "选择主角"], from_x=0.9, from_y=0.65, to_x=0.98, to_y=0.75)
-        if index == -1:
-            # 没有识别到任何已知按钮
-            raise RuntimeError("未识别到战斗按钮或跳过按钮")
-        self.operator.click_box(box, after_sleep=1.5)
-        if index == 1:  # 点击的是跳过按钮，战斗直接结束
-            logger.info("跳过战斗")
+        # 按钮偶现点击不生效：点击后需确认按钮消失，未消失则重试
+        button_labels = ["出战", "跳过", "幕后茶歇", "选择主角"]
+        button_region = {"from_x": 0.9, "from_y": 0.65, "to_x": 0.98, "to_y": 0.75}
+        # 限制处理次数，避免识别异常时无限递归
+        max_protagonist_selections = 3
+        for _ in range(max_protagonist_selections + 1):
+            index, box = self.operator.wait_ocr_any(button_labels, **button_region)
+            if index == -1:
+                # 没有识别到任何已知按钮
+                raise RuntimeError("未识别到战斗按钮或跳过按钮")
+            for _ in range(3):
+                self.operator.click_box(box, after_sleep=1.5)
+                retry_box = self.operator.ocr_match(button_labels[index], **button_region)  # pyright: ignore[reportArgumentType]
+                if retry_box is None:  # 按钮已消失，点击生效
+                    break
+                box = retry_box  # 用重新定位的位置重试
+            else:
+                logger.warning(f"点击「{button_labels[index]}」后按钮未消失，点击可能未生效")
+            if index != 3:  # 不是选择主角，继续后续战斗流程
+                break
+            self.handle_protagonist_selection()  # 选择完主角后重新进入战斗流程
+        else:
+            raise RuntimeError("战斗流程异常")
         if index == 2:  # 幕后茶歇
             self.handle_tea_break()
             return True
-        if index == 3:  # 选择主角
-            self.handle_protagonist_selection()
-            return self.battle()  # 选择完主角后重新进入战斗流程
-        else:
-            ocr_i, ocr_b = self.operator.ocr_match_any(["无角色", "未达上限"], from_x=0.36, from_y=0.44, to_x=0.64, to_y=0.5)
+        if index == 0:  # 出战：确认前台角色后等待战斗结束
+            ocr_i, _ = self.operator.ocr_match_any(["无角色", "未达上限"], from_x=0.36, from_y=0.44, to_x=0.64, to_y=0.5)
             # 检查前台区域是否有角色
-            if ocr_i != -1:
-                if ocr_i == 0:
-                    logger.error("前台区域无角色，无法出战，跳过本轮剩余流程")
-                    self.skip_current_round = True
-                    self.operator.click_img(IMG.ENSURE)
-                    return False
-                elif ocr_i == 1:
-                    logger.info("前台区域未达上限，继续战斗")
-                    self.operator.click_img(IMG.ENSURE)
-            logger.info("战斗开始，等待挑战结束")
-            if self.operator.wait_img(IMG.Q):
-                self.operator.press_key("v")
-            result, _ = self.operator.wait_any_img([CWIMG.SETTLE, CWIMG.CONTINUE], timeout=600, interval=1, trace=False)
-            if result == -1:
-                logger.warning("等待挑战结束超时")
-                for _ in range(5):
-                    self.operator.press_key('esc')
-                    self.operator.sleep(1)
-                    if self.operator.click_img(CWIMG.RETREAT):
-                        break
-                else:
-                    raise RuntimeError("挑战结束超时，未能成功中止对局")
-                self.abort_and_return() # 挑战结束超时，尝试中止并返回开始页面
+            if ocr_i == 0:
+                logger.error("前台区域无角色，无法出战，跳过本轮剩余流程")
+                self.skip_current_round = True
+                self.operator.click_img(IMG.ENSURE)
                 return False
+            elif ocr_i == 1:
+                logger.info("前台区域未达上限，继续战斗")
+                self.operator.click_img(IMG.ENSURE)
+            logger.info("战斗开始，等待挑战结束")
+            # 战斗中持续检测“未开启自动战斗”图标（Q），出现即按 V 开启；
+            # IMG.Q 放在结算/继续之后，保证战斗结束时优先判定为结束
+            waiting_templates = [CWIMG.SETTLE, CWIMG.CONTINUE, IMG.Q]
+        else:  # 跳过战斗：对局已结束，直接等待结算界面
+            logger.info("跳过战斗")
+            waiting_templates = [CWIMG.SETTLE, CWIMG.CONTINUE]
+        deadline = time.time() + 600
+        while True:
+            result, _ = self.operator.wait_any_img(waiting_templates, timeout=max(deadline - time.time(), 0),
+                                                   interval=1, trace=False)
+            if result != 2:  # 结算/继续按钮或超时（跳过战斗时没有索引 2）
+                break
+            self.operator.press_key("v")  # 按 V 开启自动战斗，继续等待
+            self.operator.sleep(1)
+        if result == -1:
+            logger.warning("等待挑战结束超时")
+            for _ in range(5):
+                self.operator.press_key('esc')
+                self.operator.sleep(1)
+                if self.operator.click_img(CWIMG.RETREAT):
+                    break
+            else:
+                raise RuntimeError("挑战结束超时，未能成功中止对局")
+            self.abort_and_return() # 挑战结束超时，尝试中止并返回开始页面
+            return False
         logger.info("挑战结束")
         self.operator.sleep(0.5)
-        return self.operator.click_point(0.5, 0.824, after_sleep=1, tag="点击继续按钮")
+        self.operator.click_point(0.5, 0.824, tag="点击继续按钮")
+        self.operator.sleep(3)
+        return True
 
     def stage_transition(self):
         """实现关卡切换逻辑，通过识别图片状态执行对应操作"""
         # 定义状态配置：(图片路径, 状态名称, 处理函数, 是否为终止状态)
         stage_config = [
-            (
-                CWIMG.FORTUNE_TELLER,
-                StageName.FORTUNE_TELLER,
-                self._handle_fortune_teller_after_battle
-            ),
             (
                 CWIMG.REPLENISH_STAGE,
                 StageName.REPLENISH_STAGE,
@@ -1046,7 +1091,12 @@ class CurrencyWars(Executable):
                 CWIMG.START_CURRENCY_WARS,
                 StageName.MAIN_MENU,
                 self.handle_main_menu
-            )
+            ),
+            (
+                CWIMG.SELECT_EQUIPMENT,
+                StageName.SELECT_EQUIPMENT,
+                lambda prev_stage: self.operator.click_point(0.5, 0.2, after_sleep=0.5, tag="选择装备")
+            ),
         ]
 
         img_list = [cfg[0] for cfg in stage_config]
@@ -1084,12 +1134,6 @@ class CurrencyWars(Executable):
         """处理主菜单界面的逻辑"""
         self.is_game_over = True
         return True
-
-    def _handle_fortune_teller_after_battle(self, _: StageName | None) -> bool:
-        """战斗结束后触发命运卜者事件"""
-        self.handle_fortune_teller()
-        self.operator.click_point(0.8438, 0.8481, after_sleep=1, tag="打开商店界面")
-        return False
 
     def handle_stage_transitioned(self) -> bool:  # NOQA
         """关卡切换完成后的处理逻辑（如有）。默认实现为无操作，子类可重写此方法以添加额外逻辑。
@@ -1153,35 +1197,42 @@ class CurrencyWars(Executable):
         self.operator.click_point(0.50, 0.84, after_sleep=1)  # 点击确认钮
         return False
 
-    def handle_fortune_teller(self):
-        """处理命运卜者事件的逻辑"""
-        return self._handle_selection_event((0.22, 0.34, 0.85, 0.4),
-                                            self.strategy_special_events.get("命运卜者", ""))
-
     def _handle_selection_event(self, ocr_region: tuple[float, float, float, float],
-                                keyword: str):
+                                keyword: str, count: int = 1):
         """
         通用事件选择处理
         :param ocr_region: OCR识别区域 (from_x, from_y, to_x, to_y)
-        :param keyword: 目标关键词
+        :param keyword: 目标关键词（空格分隔的多个关键词按顺序各匹配一个选项）
+        :param count: 需要同时选中的选项数量（如“梦境交织”需要选择两个）
         """
         boxes = self.operator.ocr_boxes(from_x=ocr_region[0], from_y=ocr_region[1],
                                         to_x=ocr_region[2], to_y=ocr_region[3])
         if not boxes:
             return False
-        target_box = None
-        candidates = keyword.split()
-        for box in boxes:
-            text = box.source.strip()
-            # 当前box包含任意一个候选关键词即命中
-            if any(k in text for k in candidates):
-                target_box = box
-                break
-        if target_box is None:
+        # 每个关键词各匹配一个尚未选中的选项
+        chosen: list[int] = []
+        for candidate in keyword.split() or [""]:
+            for index, box in enumerate(boxes):
+                if index not in chosen and candidate in box.source.strip():
+                    chosen.append(index)
+                    break
+        if not chosen:
             # 如果没有匹配的关键词，则默认选择最后一个选项
-            target_box = boxes[-1]
-        self.operator.click_box(target_box, after_sleep=1)
-        self.operator.click_img(CWIMG.CONFIRM_SELECTION, after_sleep=1)
+            chosen = [len(boxes) - 1]
+        if len(chosen) < count:
+            # 需要多选时，按 OCR 顺序补齐未选中的选项
+            chosen += [index for index in range(len(boxes)) if index not in chosen][:count - len(chosen)]
+        if len(chosen) < count:
+            logger.warning(f"事件选项不足：需要选择 {count} 个，仅识别到 {len(chosen)} 个")
+        for index in chosen:
+            self.operator.click_box(boxes[index], after_sleep=1)
+        # 确认按钮偶现点击不生效：点击后按钮应消失，仍在则重试
+        for _ in range(3):
+            self.operator.click_img(IMG.ENSURE2, after_sleep=1)
+            if not self.operator.locate(IMG.ENSURE2):
+                break
+        else:
+            raise RuntimeError("确认事件选择失败")
         return True
 
     def handle_the_planet_of_festivities(self):
@@ -1209,12 +1260,20 @@ class CurrencyWars(Executable):
         return self._handle_selection_event((0.22, 0.34, 0.85, 0.4),
                                             self.strategy_special_events.get("奇兽花园", ""))
 
+    def handle_dream_interference(self):
+        """处理梦境交织事件的逻辑（该事件需要同时选择两个选项）"""
+        return self._handle_selection_event((0.22, 0.3, 0.85, 0.36),
+                                            self.strategy_special_events.get("梦境交织", ""),
+                                            count=2)
+
     def detect_special_event(self) -> str:
         """检测当前是否有特殊事件发生，并返回事件名称"""
         result = self.operator.ocr(from_x=0.49, from_y=0.038, to_x=0.60, to_y=0.11)
         if not result:
             return ""
-        text = result[0][1]
+        # OCR 可能把标题切成多个片段，括号等符号也容易被识别成噪声（如“我来当(?策划”），
+        # 因此先按坐标拼接，再只保留汉字匹配标题
+        text = re.sub(r"[^\u4e00-\u9fff]", "", _merge_ocr_text(result))
         # 遍历特殊事件列表，匹配标题
         for event, (title, handler) in self.special_events.items():
             if title in text:
@@ -1301,19 +1360,26 @@ class CurrencyWars(Executable):
         logger.info("选择主角")
         self.operator.click_point(0.2, 0.3, after_sleep=1, tag="选择左侧效果")
         target = (0.5, 0.4)
-        origin = None
-        for i, c in enumerate(self.on_field_character):
-            if c is None:
-                continue
-            else:
-                origin = (0.42+i*0.5, 0.56)
-                break
-        if origin is None:
+        # 从前台角色中按优先级从高到低依次尝试
+        candidates = sorted(((i, c) for i, c in enumerate(self.on_field_character) if c is not None),
+                            key=lambda item: item[1].priority or 0, reverse=True)
+        if not candidates:
             raise RuntimeError("未检测到前台角色，无法选择主角")
-        self.operator.drag_to(origin[0], origin[1], target[0], target[1])  # 拖动角色到主角位置
-        self.operator.sleep(0.5)
-        self.operator.click_point(0.5, 0.888, after_sleep=1, tag="点击确认选择主角")
-        return True
+        for index, character in candidates:
+            logger.info(f"选择主角：{character.name}（优先级 {character.priority}）")
+            origin = (0.42+index*0.05, 0.56)
+            self.operator.drag_to(origin[0], origin[1], target[0], target[1])  # 拖动角色到主角位置
+            self.operator.sleep(0.5)
+            self.operator.click_point(0.5, 0.888, after_sleep=1, tag="点击确认选择主角")
+            # 该角色已有主角效果时会弹出替换光环提示，只识别提示文字所在的小块区域
+            if self.operator.ocr_match("替换", from_x=0.38, from_y=0.43, to_x=0.65, to_y=0.53):
+                # 该角色已有主角效果：关闭替换提示，换下一个角色重试
+                logger.warning(f"角色 {character.name} 已有主角效果，换下一个角色重试")
+                self.operator.press_key("esc")
+                self.operator.sleep(1)
+                continue
+            return True
+        raise RuntimeError("未能选择主角：所有前台角色都已有主角效果")
 
     def shopping(self):
         def scan_characters_in_store() -> list[Character] | None:
@@ -1530,7 +1596,7 @@ class CurrencyWars(Executable):
             if character.position == Positioning.OffField:
                 continue
             if self.place_on_field_character(i):
-                self.operator.sleep(1)
+                self.operator.sleep(2)
                 self.handle_special_event()
 
         # 第二次遍历：仅处理后台角色（Positioning.OffField），填充剩余空位或替换
@@ -1541,7 +1607,7 @@ class CurrencyWars(Executable):
             if character.position == Positioning.OnField:
                 continue
             if self.place_off_field_character(i):
-                self.operator.sleep(1)
+                self.operator.sleep(2)
                 self.handle_special_event()
 
         # 若前台为空，则从后台提升一个角色到前台第一个位置，避免出现前台全空的情况
