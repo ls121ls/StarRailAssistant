@@ -18,6 +18,19 @@ from SRACore.task import Executable
 from SRACore.util.errors import ErrorCode, SRAError, ThreadStoppedError
 from .characters import Character, Characters, Positioning
 from tasks.img import IMG, DUIMG
+from tasks.currency_wars.shared_constants import (
+    FIELD_REPLACING_INVESTMENTS as FIELD_REPLACING_NAMES,
+    ROSTER_CHURN_INVESTMENTS as ROSTER_CHURN_NAMES,
+    LEAST_HARMFUL_INVESTMENTS as LEAST_HARMFUL_NAMES,
+    INVEST_CARD_CENTERS as INVEST_CARD_CENTERS_SHARED,
+    INVEST_CARDS_ROI as INVEST_CARDS_ROI_SHARED,
+    INVEST_STRATEGY_REFRESH_TIMES as INVEST_STRATEGY_REFRESH_TIMES_SHARED,
+    invest_column_of, least_harmful_invest_column, rank_invest_columns,
+    investment_risk, normalize_invest_text,
+)
+from tasks.currency_wars.invest_cards import (
+    read_invest_cards, refresh_blocked_invest_card, select_invest_column,
+)
 from .images import CWIMG
 from .game_input import adapt_game_input
 from .unicode_templates import load_template, load_match_template, template_cache_key, locate_first
@@ -132,10 +145,18 @@ class CurrencyWars(Executable):
     STRATEGY_APPLIED_IMAGE = str(RESOURCE_ROOT / "cancel_apply.png")
     SHOP_REFRESH_COST = 2  # 真实日志中的连续余额 51 → 49 → 47 已确认此费用。
     FINAL_ROUND_REFRESH_LIMIT = 80  # 包含免费刷新和同回合恢复。
-    # 会替换或清空已上阵角色的投资策略：选中后前后台阵容不能沿用缓存。
-    FIELD_REPLACING_INVESTMENTS = ("全员晋升", "大裁员", "降本增效", "现金为王", "人力重组")
-    INVEST_CARD_CENTERS = ((0.27, 0.30), (0.50, 0.30), (0.73, 0.30))
-    INVEST_CARDS_ROI = (0.05, 0.10, 0.95, 0.62)
+    # 投资策略名单与主任务共用 shared_constants 中的同一份定义，避免数据刷新后两份名单不同步。
+    # 2 级：清空/替换已上阵阵容，必须避开；1 级：周期性改动备战席，优先避开但可作为退让选项。
+    FIELD_REPLACING_INVESTMENTS = FIELD_REPLACING_NAMES
+    ROSTER_CHURN_INVESTMENTS = ROSTER_CHURN_NAMES
+    # 三张卡都是 2 级时的兜底顺序：优先选最容易重建阵容的一张。
+    LEAST_HARMFUL_INVESTMENTS = LEAST_HARMFUL_NAMES
+    INVEST_CARD_CENTERS = INVEST_CARD_CENTERS_SHARED
+    INVEST_CARDS_ROI = INVEST_CARDS_ROI_SHARED
+    # 三张卡各带一个一次性刷新按钮，一屏最多 3 次刷新机会。
+    INVEST_STRATEGY_REFRESH_TIMES = INVEST_STRATEGY_REFRESH_TIMES_SHARED
+    # 投资策略三选一（含刷新重读）的独立导航预算，避免挤占确认页的 15 秒额度。
+    INVEST_SELECTION_TIMEOUT = 45
 
     SHOP_EXPERIENCE_COST = 4  # 这是本玩法单次 F 输入的价格，并非整级升级价格。
 
@@ -6379,72 +6400,98 @@ class CurrencyWars(Executable):
             {"evidence": "no_confirmed_next_stage_after_boss_notice"}, critical=True)
         raise RuntimeError("强敌提示确认后仍未退场")
 
-    def _select_invest_strategy_card(self, collection):
-        """优先选攻略/配置推荐的投资策略，并避开会替换已上阵角色的卡。"""
-        centers, roi = self.INVEST_CARD_CENTERS, self.INVEST_CARDS_ROI
-        context = getattr(self.operator, "window_context", None)
-        width = getattr(context, "width", 0) or 0
-        height = getattr(context, "height", 0) or 0
-        blocked, titles = set(), {}
-        card_boxes = {}
-        try:
-            boxes = self.operator.ocr_boxes(from_x=roi[0], from_y=roi[1],
-                                            to_x=roi[2], to_y=roi[3], trace=False)
-        except (ThreadStoppedError, InterruptedError):
-            raise
-        except Exception as error:
-            self._check_stop()
-            boxes = None
-            logger.debug(f"[投资策略] 卡片文字读取失败：{type(error).__name__}")
+    def _least_harmful_invest_column(self, titles) -> int:
+        """三张卡都会清空/替换阵容时，按「最容易重建阵容」的顺序挑一张。"""
+        return least_harmful_invest_column(titles)
 
-        def column_of(center_x):
-            if not width:
-                return None
-            ratio = center_x / width
-            return min(range(len(centers)), key=lambda i: abs(ratio - centers[i][0]))
+    def _read_invest_cards(self):
+        """读取三张卡的文字，返回 (titles, card_boxes, risk_by_column)。"""
+        return read_invest_cards(self.operator,
+                                 on_error=self._on_invest_ocr_failure,
+                                 reraise=(ThreadStoppedError, InterruptedError))
 
-        for box in boxes or ():
-            text = re.sub(r"\s+", "", str(getattr(box, "source", "") or ""))
-            column = column_of(box.left + box.width / 2)
-            if not text or column is None:
-                continue
-            # 标题栏等页面文字不属于卡片，不能当作卡片证据。
-            if height and not 0.16 <= (box.top + box.height / 2) / height <= 0.62:
-                continue
-            titles.setdefault(column, [])
-            if len(titles[column]) < 3:
-                titles[column].append(text[:40])
-            card_boxes.setdefault(column, box)
-            if any(word in text for word in self.FIELD_REPLACING_INVESTMENTS):
-                blocked.add(column)
-        collection_column = column_of(collection.center[0]) if collection is not None else None
+    def _on_invest_ocr_failure(self, error: Exception) -> None:
+        """OCR 失败时先确认任务没被要求停止，再降级为「读不到卡片」。"""
+        self._check_stop()
+        logger.debug(f"[投资策略] 卡片文字读取失败：{type(error).__name__}")
+
+    def _pick_invest_target(self, titles, risk_by_column, collection_column):
+        """返回 (target, priority_hit, forced)。
+
+        0 级卡优先，1 级（只改备战席）作为退让，2 级卡绝不主动选；
+        forced 为 True 表示三列都只能避开，调用方需要先尝试刷新。
+        """
+        safe, acceptable = rank_invest_columns(risk_by_column)
         priorities = self._investment_priorities()
         priority_hit = None
         for name in priorities:
-            if any(word in name for word in self.FIELD_REPLACING_INVESTMENTS):
+            risk = investment_risk(name)
+            if risk == 2:
                 logger.warning(f"[投资策略] 优先项={name} 会替换已上阵角色，跳过")
                 continue
-            for column in (1, 0, 2):
-                if column in blocked:
-                    continue
-                if any(name in text for text in titles.get(column, ())):
-                    priority_hit = (name, column)
+            if risk == 1:
+                logger.info(f"[投资策略] 优先项={name} 会改动备战席，仅在无更安全选项时考虑")
+            normalized = normalize_invest_text(name)
+            for candidates in (safe, acceptable):
+                for column in candidates:
+                    if any(normalized in text for text in titles.get(column, ())):
+                        priority_hit = (name, column)
+                        break
+                if priority_hit is not None:
                     break
             if priority_hit is not None:
                 break
         if priority_hit is not None:
-            target = priority_hit[1]
+            return priority_hit[1], priority_hit, False
+        target, forced = select_invest_column(risk_by_column, collection_column)
+        return target, None, forced
+
+    def _refresh_invest_card(self, titles, risk_by_column, width) -> bool:
+        """三张卡都要避开时刷新危害最高的一张，兜底卡保持不动。"""
+        return refresh_blocked_invest_card(
+            self.operator, CWIMG.INVEST_STRATEGY_REFRESH, titles, risk_by_column, width)
+
+    def _select_invest_strategy_card(self, collection):
+        """优先选攻略/配置推荐的投资策略，按危害等级避开会改动阵容的卡。
+
+        三张卡都会清空/替换阵容时，先按每张卡自带的刷新按钮刷掉危害最高的一张
+        并重新识别（一屏最多 3 次），仍然没有安全选项才退回「影响最小的一张」。
+        """
+        centers = self.INVEST_CARD_CENTERS
+        context = getattr(self.operator, "window_context", None)
+        width = getattr(context, "width", 0) or 0
+        collection_column = (invest_column_of(collection.center[0], width, centers)
+                             if collection is not None else None)
+        titles, card_boxes, risk_by_column = {}, {}, {}
+        target, priority_hit, forced = 1, None, False
+        refreshed = 0
+        for attempt in range(self.INVEST_STRATEGY_REFRESH_TIMES + 1):
+            titles, card_boxes, risk_by_column = self._read_invest_cards()
+            target, priority_hit, forced = self._pick_invest_target(
+                titles, risk_by_column, collection_column)
+            if not forced:
+                break
+            if attempt == self.INVEST_STRATEGY_REFRESH_TIMES:
+                break
+            if not self._refresh_invest_card(titles, risk_by_column, width):
+                break
+            refreshed += 1
+            self._check_stop()
+        if forced:
+            # 刷新用尽或不可用：不再静默点中间卡，明确告警并挑最容易重建阵容的一张。
+            target = self._least_harmful_invest_column(titles)
+            logger.warning(f"[投资策略] 三张投资策略均会清空/替换阵容，已刷新 {refreshed} 次仍无安全选项；"
+                           f"选择影响最小的一张（第{target + 1}张）：{titles.get(target)}")
+        elif priority_hit is not None:
             logger.info(f"[投资策略] 优先命中={priority_hit[0]} 选择={target} 卡片={titles}")
+        elif refreshed:
+            logger.info(f"[投资策略] 刷新 {refreshed} 次后命中安全选项，选择={target} 卡片={titles}")
         else:
-            target = None
-            if collection_column is not None and collection_column not in blocked:
-                target = collection_column
-            if target is None:
-                target = next((index for index in (1, 0, 2) if index not in blocked), 1)
-            if priorities:
+            blocked = sorted(column for column, risk in risk_by_column.items() if risk >= 2)
+            if self._investment_priorities():
                 logger.info(f"[投资策略] 优先项未命中，沿用默认选择={target} 卡片={titles}")
-            elif titles or blocked:
-                logger.info(f"[投资策略] 卡片={titles} 避开={sorted(blocked)} 选择={target}")
+            else:
+                logger.info(f"[投资策略] 卡片={titles} 避开={blocked} 选择={target}")
         # 淘金客：本局一旦选中该投资策略，后续升级将用刷新代替购买经验。
         if not self._gold_digger_selected:
             chosen_text = "".join(titles.get(target, ()))
@@ -6463,7 +6510,8 @@ class CurrencyWars(Executable):
 
     def handle_invest_strategy(self, prev_stage: StageName | None) -> bool:
         """处理投资策略选择界面的逻辑"""
-        deadline = self._page_navigation_limit(self.EVENT_TRANSITION_TIMEOUT)
+        # 三选一最多要读 4 次屏并刷新 3 次卡，单独给预算，不挤占后续确认页的导航额度。
+        deadline = self._page_navigation_limit(self.INVEST_SELECTION_TIMEOUT)
         self._check_page_navigation_deadline(deadline)
         collection = self.operator.locate(CWIMG.COLLECTION)
         self._check_page_navigation_deadline(deadline)
@@ -6473,7 +6521,7 @@ class CurrencyWars(Executable):
         selected = self._select_invest_strategy_card(collection)
         if not selected:
             return False  # False 也可能已经生效，保留收据，不能改点另一选项。
-        self._confirm_invest_strategy(deadline)
+        self._confirm_invest_strategy(self._page_navigation_limit(self.EVENT_TRANSITION_TIMEOUT))
         return False
 
     def _confirm_invest_strategy(self, deadline):

@@ -15,5 +15,7 @@
   "攻略.title": "攻略",
   "运行次数.title": "运行次数",
   "难度.title": "难度",
-  "超频博弈.title": "超频博弈"
+  "超频博弈.title": "超频博弈",
+  "投资策略优先.title": "投资策略优先",
+  "投资策略优先.description": "可选；用分号分隔投资策略名称，越靠前越优先。留空时使用攻略里的 recommend_invest_strategies。"
 }

@@ -12,6 +12,16 @@ from SRACore.operators.model import Box
 from SRACore.task import Executable
 from SRACore.util.errors import ErrorCode, SRAError
 from tasks.currency_wars.characters import Character, Characters, Positioning
+from tasks.currency_wars.shared_constants import (
+    EQUIPMENT_ROUNDS,
+    INVEST_CARD_CENTERS as INVEST_CENTERS,
+    INVEST_CARDS_ROI as INVEST_ROI,
+    INVEST_STRATEGY_REFRESH_TIMES as INVEST_REFRESH_TIMES,
+    invest_column_of, least_harmful_invest_column,
+)
+from tasks.currency_wars.invest_cards import (
+    read_invest_cards, refresh_blocked_invest_card, select_invest_column,
+)
 from tasks.img import CWIMG, IMG, DUIMG
 
 
@@ -29,9 +39,7 @@ class CurrencyWarsPage(enum.IntEnum):
     UNKNOWN = -1
 
 
-# 当前对局节点数：位面1 共9个（1-9首领），位面2/3 各7个（2-7/3-7首领）。
-# 装备只在每个位面的第4个节点和最后一个节点处理，其余节点不打开装备面板。
-EQUIPMENT_ROUNDS = frozenset({(1, 4), (1, 9), (2, 4), (2, 7), (3, 4), (3, 7)})
+# 装备节点（EQUIPMENT_ROUNDS）与 cw_plus 共用 shared_constants 中的同一份定义
 # 每个角色最多穿戴3件装备
 MAX_EQUIPMENT_PER_CHARACTER = 3
 # 启动时若游戏正处于战斗中，等待战斗结束的最长时间（秒）
@@ -120,6 +128,12 @@ def _merge_ocr_text(fragments: list[tuple[list[tuple[int, int]], str, float]]) -
 
 
 class CurrencyWars(Executable):
+    # 投资策略三选一的卡片坐标、刷新次数与「会清场/换人」的名单都和 cw_plus 共用 shared_constants，
+    # 避免两个实现在资料刷新后各自维护一份而悄悄不同步。
+    INVEST_CARD_CENTERS = INVEST_CENTERS
+    INVEST_CARDS_ROI = INVEST_ROI
+    INVEST_STRATEGY_REFRESH_TIMES = INVEST_REFRESH_TIMES
+
     def __init__(self, operator, runtimes, isPointRewardsEnabled: bool = False):
         super().__init__(operator)
         self.runtimes = runtimes
@@ -986,8 +1000,9 @@ class CurrencyWars(Executable):
     def refresh_character(self, equip: bool = True):
         """ 刷新角色信息，确保备战席中未放置的角色状态正确。
 
-        完整扫描会依次点击槽位识别身份；需要装备时，扫描完成后只按缓存
-        给可装备的出场角色穿戴/合成，不再为装备重扫一遍所有槽位。
+        扫描骨架与上游 v2.25.2 保持一致（前台扫描 -> 后台槽位识别含矩形去重 -> 后台扫描），
+        OCR 统一走 _merge_ocr_lines 逐行拼接；在此基础上把「穿戴」从扫描里剥离：
+        完整扫描后只按缓存给可装备的出场角色穿戴/合成，不再为装备重扫一遍所有槽位。
         """
         self.get_on_field_area(True)
         self.operator.sleep(0.3)
@@ -1002,16 +1017,23 @@ class CurrencyWars(Executable):
                 c.is_placed = False
 
     def _sync_off_field_area(self):
-        """只识别后台槽位坐标，不点击任何槽位。"""
+        """只识别后台槽位坐标，不点击任何槽位。
+
+        矩形去重沿用上游 v2.25.2 的实现（中心距离小于 100 视为同一个位置）：
+        定点穿戴按缓存下标点槽位，重复坐标会让它点到同一位置或越界。
+        """
         boxes = self.operator.rectangle_detect(120, 150, 130, 150,
                                                from_x=0.1, from_y=0.52, to_x=0.86, to_y=0.7,
-                                               trace=False)
+                                               trace=True)
         if not boxes:
             return
-        sorted_boxes = sorted(boxes, key=lambda b: b.left)
+        unique_boxes: list[Box] = []
+        for b in sorted(boxes, key=lambda b: b.left):
+            if all(b.distance(u) >= 100 for u in unique_boxes):
+                unique_boxes.append(b)
         self.off_field_area = [
             (b.center[0] / self.operator.window_context.width, b.center[1] / self.operator.window_context.height)
-            for b in sorted_boxes
+            for b in unique_boxes
         ]
         # 同步调整角色列表长度
         if len(self.off_field_area) > len(self.off_field_character):
@@ -1156,6 +1178,15 @@ class CurrencyWars(Executable):
         # 角色名称OCR区域
         ocr_from_x, ocr_from_y, ocr_to_x, ocr_to_y = (0.775, 0.185, 0.880, 0.258)
 
+        def ocr_fragments(rows):
+            # 空位背景常被误识别为「1」等数字/符号，只保留包含文字的片段
+            return [item for item in rows or () if re.search(r"[^\W\d_]", item[1])]
+
+        def ocr_name(rows) -> str:
+            """按上游 v2.25.2 的逐行拼接得到角色名，主/备 OCR 区域统一走这条路径。"""
+            fragments = ocr_fragments(rows)
+            return "".join(_merge_ocr_lines(fragments)) if fragments else ""
+
         for index, area in enumerate(areas):
             try:
                 # 点击区域（带延迟，确保界面响应）
@@ -1172,7 +1203,7 @@ class CurrencyWars(Executable):
                     to_x=ocr_to_x,
                     to_y=ocr_to_y
                 )
-                name = _merge_ocr_text(character_names) if character_names else ""
+                name = ocr_name(character_names)
 
                 if use_backup_ocr and not _looks_like_character_name(name):
                     # 主区域未读到有效名称时尝试备用区域，狸猫/佩佩等角色名称可能显示在其他位置
@@ -1184,11 +1215,10 @@ class CurrencyWars(Executable):
                     )
                     if backup_names:
                         character_names = backup_names
-                        name = _merge_ocr_text(backup_names)
+                        name = ocr_name(backup_names)
 
-                # 更新角色列表
-                # 空位背景常被误识别为“1”等数字/符号，只保留包含文字的片段
-                fragments = [item for item in character_names or () if re.search(r"[^\W\d_]", item[1])]
+                # 更新角色列表（与 ocr_name 使用同一套片段过滤，避免主/备路径判定不一致）
+                fragments = ocr_fragments(character_names)
                 if fragments:
                     # OCR 可能把名字切成多个重叠的文本框，也可能把下方标签一起识别进来：
                     # 逐行累加，优先采用能匹配角色表的组合（如“银狼LV.999”而不是“银狼LV.999前台”）
@@ -1534,10 +1564,65 @@ class CurrencyWars(Executable):
         self.operator.click_point(0.5, 0.70, after_sleep=1)
         return False
 
+    def _read_invest_cards(self):
+        """OCR 三张投资策略卡，返回 (titles, card_boxes, risk_by_column)。"""
+        return read_invest_cards(self.operator)
+
+    def _refresh_invest_card(self, titles, risk_by_column, width) -> bool:
+        """三张卡都要避开时刷新危害最高的一张，兜底卡保持不动。"""
+        return refresh_blocked_invest_card(
+            self.operator, CWIMG.INVEST_STRATEGY_REFRESH, titles, risk_by_column, width)
+
+    def _select_invest_strategy_card(self) -> bool:
+        """按危害等级选择投资策略：安全卡优先，收藏卡仅在其自身安全时沿用。
+
+        三张卡都会清空/替换阵容时，先按每张卡自带的刷新按钮刷掉危害最高的一张
+        并重新识别，仍然没有安全选项才退回「影响最小的一张」。
+        """
+        centers = self.INVEST_CARD_CENTERS
+        context = getattr(self.operator, "window_context", None)
+        width = getattr(context, "width", 0) or 0
+        collection = self.operator.locate(CWIMG.COLLECTION)
+        collection_column = (invest_column_of(collection.center[0], width, centers)
+                             if collection is not None else None)
+        titles, card_boxes, risk_by_column = {}, {}, {}
+        target, forced, refreshed = 1, False, 0
+        # 记录本次实际选中的卡名，供刷开局侧把兜底选择写进「本局已选投资策略」。
+        self._selected_invest_card_title = None
+        for attempt in range(self.INVEST_STRATEGY_REFRESH_TIMES + 1):
+            titles, card_boxes, risk_by_column = self._read_invest_cards()
+            chosen, forced = select_invest_column(risk_by_column, collection_column)
+            if not forced:
+                target = chosen
+                break
+            if attempt == self.INVEST_STRATEGY_REFRESH_TIMES:
+                break
+            if not self._refresh_invest_card(titles, risk_by_column, width):
+                break
+            refreshed += 1
+        if forced:
+            target = least_harmful_invest_column(titles)
+        title = next(iter(titles.get(target, ())), None)
+        self._selected_invest_card_title = title
+        label = f"第{target + 1}张「{title}」" if title else f"第{target + 1}张（卡名未识别）"
+        if forced:
+            logger.warning(f"三张投资策略均会清空/替换阵容，已刷新 {refreshed} 次仍无安全选项；"
+                           f"选择影响最小的一张：{label}")
+        elif collection is not None and target == collection_column:
+            logger.info(f"投资策略沿用收藏卡：{label}")
+        else:
+            logger.info(f"投资策略选择：{label}")
+        if collection is not None and target == collection_column and self.operator.click_img(CWIMG.COLLECTION):
+            return True
+        box = card_boxes.get(target)
+        if box is not None and self.operator.click_box(box):
+            return True
+        return bool(self.operator.click_point(*centers[target], after_sleep=0.5,
+                                              tag=f"选择第{target + 1}张投资策略"))
+
     def handle_invest_strategy(self, prev_stage: StageName | None) -> bool:
-        """处理投资策略选择界面的逻辑"""
-        if not self.operator.click_img(CWIMG.COLLECTION):
-            self.operator.click_point(0.5, 0.3, after_sleep=0.5, tag="选择中间的投资策略")
+        """处理投资策略选择界面的逻辑：先避开会清空/替换阵容的卡，收藏卡仅在其安全时沿用"""
+        self._select_invest_strategy_card()
         self.operator.click_img(IMG.ENSURE2, after_sleep=1)
         self.post_invest_strategy()
         return False

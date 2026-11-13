@@ -7,6 +7,7 @@ from SRACore.util import strutil
 from SRACore.util.logger import logger
 from tasks.img import CWIMG, IMG
 from .CurrencyWars import CurrencyWars, StageName
+from .shared_constants import investment_risk
 
 
 class PriorityMatcher(strutil.StrMatcher):
@@ -137,6 +138,11 @@ class RerollStart(CurrencyWars):
         # 去除末尾空字符串（如"策略1;"会分割为["策略1", ""]）
         if stages[-1] == "":
             stages.pop()
+        for stage in stages:
+            for candidate in re.split(r"[|｜]", stage):
+                if investment_risk(candidate) == 2:
+                    logger.warning(f"投资策略候选「{candidate.strip()}」会清空/替换阵容，"
+                                   f"仍按显式配置参与匹配，请确认是否要移除")
         matchers = [self._build_strategy_matcher(stage) for stage in stages]
         self.wanted_invest_strategies = matchers
         # 显式配置了候选表时，开局达成后的三选一也按它优先挑选
@@ -165,11 +171,20 @@ class RerollStart(CurrencyWars):
         recommendations = self.recommend_invest_strategies
         if not recommendations:
             return False
-        self.recommended_strategy_matcher = PriorityMatcher("|".join(recommendations))
+        # 攻略推荐里若混入会清空/替换阵容的策略，直接剔除，避免刷开局把阵容刷没了。
+        safe = []
+        for name in recommendations:
+            if investment_risk(name) == 2:
+                logger.warning(f"攻略推荐的投资策略「{name}」会清空/替换阵容，已跳过")
+                continue
+            safe.append(name)
+        if not safe:
+            return False
+        self.recommended_strategy_matcher = PriorityMatcher("|".join(safe))
         if self.wanted_invest_strategies:
             return False
         self.wanted_invest_strategies = [self.recommended_strategy_matcher]
-        logger.info(f"未配置投资策略，沿用攻略推荐：{'、'.join(recommendations)}")
+        logger.info(f"未配置投资策略，沿用攻略推荐：{'、'.join(safe)}")
         return True
 
     def set_boss_name(self, boss_names: str):
@@ -269,9 +284,12 @@ class RerollStart(CurrencyWars):
         return False
 
     def _record_fallback_strategy(self) -> None:
-        """记录兜底选择（收藏卡/中间卡）：OCR 结果里能对上就记卡名"""
+        """记录兜底选择：优先记基础逻辑实际选中的卡名，读不到再退回收藏卡/中间卡"""
         self.invest_strategy_misses += 1
-        if self.operator.locate(CWIMG.COLLECTION):
+        chosen = getattr(self, "_selected_invest_card_title", None)
+        if chosen:
+            name = chosen
+        elif self.operator.locate(CWIMG.COLLECTION):
             name = "收藏卡（未刷到候选）"
         elif len(self._last_strategy_cards) > 1:
             name = self._last_strategy_cards[1]
@@ -331,9 +349,10 @@ class RerollStart(CurrencyWars):
         if self.opening_satisfied:
             if self._pick_recommended_strategy():
                 return False
+            # 先让基础逻辑按危害等级选卡，再记录它实际选中的那张，避免邮件里的记录与实际点击不一致。
+            super().handle_invest_strategy(prev_stage=prev_stage)
             if self.recommended_strategy_matcher is not None:
                 self._record_fallback_strategy()
-            super().handle_invest_strategy(prev_stage=prev_stage)
             return False
 
         # 检测是否为同一阶段的re-trigger（游戏连续两次弹出投资策略选择界面）
@@ -375,11 +394,12 @@ class RerollStart(CurrencyWars):
             return True
 
         # 三张卡都刷过、且最后一次识别仍未命中：不再重开，按基础逻辑（收藏卡/中间卡）选一张继续对局
-        self._record_fallback_strategy()
-        return self._continue_with_default_strategy(
+        self._continue_with_default_strategy(
             prev_stage,
             f"阶段{self.invest_strategy_stage}未刷到要求的投资策略（不重开）",
         )
+        self._record_fallback_strategy()
+        return False
 
     def handle_stage_transitioned(self) -> bool:
         if self.reroll:
@@ -428,6 +448,9 @@ class RerollStart(CurrencyWars):
             if best_box is None or priority < best_priority:
                 best_box, best_priority = invest_strategy, priority
         if best_box is not None:
+            if investment_risk(best_box.source) == 2:
+                logger.warning(f"命中了会清空/替换阵容的投资策略 {best_box.source}，"
+                               f"这是显式配置或攻略推荐的结果，请确认对局影响")
             logger.info(f"检测到需要的投资策略 {best_box.source} (匹配: {wanted_strategy.value})")
         return best_box
 
