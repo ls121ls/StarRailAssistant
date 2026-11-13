@@ -15,7 +15,7 @@ public enum UiLanguage
 
 public class AppSettings
 {
-    public const string Version = "2.25.2"; // 应用版本号
+    public const string Version = "2.25.3"; // 应用版本号
 
     [JsonPropertyName("general"), Description("通用设置")] public GeneralSettings General { get; init; } = new();
 
@@ -47,7 +47,7 @@ public partial class GeneralSettings : ObservableObject
 
     [ObservableProperty]
     [property: JsonPropertyName("gameArgs.enabled")]
-    [property: Description("是否启用游戏启动参数，启用后将使用下面的参数启动游戏")]
+    [property: Description("是否自动设置游戏窗口，启用后按窗口尺寸与显示模式写入游戏配置")]
     private bool _isGameArgsEnabled = true;
 
     [ObservableProperty]
