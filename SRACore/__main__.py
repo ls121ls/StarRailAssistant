@@ -31,7 +31,14 @@ def main():
     if args.no_admin:
         sys.argv.remove('--no-admin')  # 移除参数，不向下传递（无论是否已是管理员）
     if not is_admin():
-        if args.no_admin:
+        if args.inline:
+            # 由前端托管时绝不能在这里另起进程：wt.exe/runas 会开一个脱离管道的
+            # 新进程，前端监控的那个进程随即退出，界面就再也收不到任何响应了。
+            # 这里退化为「非管理员运行」，把问题以 stderr 的形式交给前端显示。
+            print(Resources.cli_noAdminWarning, file=sys.stderr)
+            print("提示：请用项目根目录的「启动SRA.bat」以管理员身份启动，否则可能无法操作游戏窗口。",
+                  file=sys.stderr)
+        elif args.no_admin:
             print(Resources.cli_noAdminWarning)
         else:
             restart_as_admin()
@@ -40,6 +47,8 @@ def main():
     context = AppContext(log_level=args.log_level)
     from SRACore.util.logger import logger
     logger.info(f"Current version: {VERSION}")
+    if not is_admin() and args.inline:
+        logger.warning("后端未以管理员权限运行：游戏窗口操作可能失败，请用「启动SRA.bat」以管理员身份启动")
     logger.debug(f"cwd: {os.getcwd()}")
 
     if args.command:

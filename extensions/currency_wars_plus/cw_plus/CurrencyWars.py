@@ -548,6 +548,27 @@ class CurrencyWars(Executable):
                     goals[name] = max(goals.get(name, 0), stars)
         return goals
 
+    def _field_full_of_strategy_characters(self):
+        """普通角色席位已满，且场上角色都在攻略名单内（NPC 视为合格）。
+        有空位或未确认槽位且人口未满时视为未满，避免误跳过补位购买。
+        """
+        slots = [o for area in ("on_field", "off_field") for o in self._observations[area]]
+        if not slots:
+            return False
+        known = [o for o in slots if o.state == SlotState.KNOWN]
+        ordinary = [o for o in known
+                    if not getattr(getattr(o, "character", None), "is_npc", False)]
+        capacity = self._effective_formation().strategy_capacity
+        if type(capacity) is int and capacity > 0:
+            full = len(ordinary) >= capacity
+        else:
+            full = not any(o.state in (SlotState.EMPTY, SlotState.UNKNOWN) for o in slots)
+        if not full:
+            return False
+        return bool(known) and all(
+            getattr(getattr(o, "character", None), "name", None) in self.strategy_characters
+            or getattr(getattr(o, "character", None), "is_npc", False) for o in known)
+
     def _role_evaluations(self):
         stage = self._formation_stage()
         return evaluate_role_requirements(self.formation_config, stage, self._observations)
@@ -8465,6 +8486,11 @@ class CurrencyWars(Executable):
                     if char.name in checked_purchase_names and (not fields and not bench or
                             any(o.stars is None for o in fields + bench)):
                         logger.info(f"[购买复核] {char.name} 合成或持有星级未知，暂停同名重复购买")
+                        continue
+                    if not fields and not is_first_main and self._field_full_of_strategy_characters():
+                        # 场上已满且都是攻略角色，再买不在场上的角色只会堆在备战席。
+                        # 已在场上的角色仍可继续买，用于升星。
+                        logger.info(f"买牌决策=field_full_qualified {char.name}：场上已满且均为攻略角色，跳过新角色")
                         continue
                     decision = evaluate_purchase(
                         card, target_stars=goal,

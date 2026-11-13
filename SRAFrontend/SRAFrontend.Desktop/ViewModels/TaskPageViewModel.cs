@@ -183,26 +183,60 @@ public partial class TaskPageViewModel : PageViewModel
         get => CosmicStrifeConfig.CurrencyWarsStrategyIndex;
         set
         {
+            var previous = CosmicStrifeConfig.CurrencyWarsStrategyIndex >= 0
+                ? Cache.Strategies.ElementAtOrDefault(CosmicStrifeConfig.CurrencyWarsStrategyIndex)
+                : null;
+            var strategy = value >= 0 ? Cache.Strategies.ElementAtOrDefault(value) : null;
             CosmicStrifeConfig.CurrencyWarsStrategyIndex = value;
             OnPropertyChanged();
-            var strategy = Cache.Strategies.ElementAtOrDefault(value);
             CosmicStrifeConfig.CurrencyWarsStrategy = strategy?.FileName ?? "";
-            // 选择攻略时自动带入其推荐投资环境（多个候选以空格分隔，? 前缀表示可选）
-            if (strategy is { RecommendEnvironments.Count: > 0 })
-                CosmicStrifeConfig.CurrencyWarsRerollInvestEnvironments =
-                    string.Join(" ", strategy.RecommendEnvironments);
+            // 选择攻略时自动带入其推荐投资环境（多个候选以空格分隔，? 前缀表示可选）；
+            // 输入框为空或仍是上一份攻略带入的内容时才覆盖，避免冲掉手动填写
+            var environments = strategy is { RecommendEnvironments.Count: > 0 }
+                ? string.Join(" ", strategy.RecommendEnvironments)
+                : "";
+            var previousEnvironments = previous is { RecommendEnvironments.Count: > 0 }
+                ? string.Join(" ", previous.RecommendEnvironments)
+                : "";
+            if (environments.Length > 0 &&
+                CanAutoFill(CosmicStrifeConfig.CurrencyWarsRerollInvestEnvironments, previousEnvironments))
+                CosmicStrifeConfig.CurrencyWarsRerollInvestEnvironments = environments;
+            // 选择攻略时自动带入其推荐投资策略（攻略按优先级分号分隔，这里合并为同一阶段的候选表）
+            var investStrategies = BuildInvestStrategyText(strategy?.RecommendInvestStrategies);
+            if (investStrategies.Length > 0 &&
+                CanAutoFill(CosmicStrifeConfig.CurrencyWarsRerollInvestStrategies,
+                    BuildInvestStrategyText(previous?.RecommendInvestStrategies)))
+                CosmicStrifeConfig.CurrencyWarsRerollInvestStrategies = investStrategies;
             OnPropertyChanged(nameof(SelectedStrategyInvestHint));
         }
     }
 
-    /// <summary>当前所选攻略推荐的按阶段投资策略，供刷开局时参照填写</summary>
+    /// <summary>输入框为空或仍是上一份攻略带入的内容时，才允许自动带入，避免覆盖手动填写。</summary>
+    private static bool CanAutoFill(string current, string previousAuto)
+        => current.Length == 0 || current == previousAuto;
+
+    /// <summary>把攻略里按优先级排列的投资策略（分号分隔）转成配置格式：同一阶段内用 | 分隔候选，越靠左越优先。</summary>
+    private static string BuildInvestStrategyText(string? recommend)
+    {
+        if (string.IsNullOrWhiteSpace(recommend)) return "";
+        var names = recommend
+            .Split(new[] { ';', '；', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(name => name.Trim().Replace(" ", ""))
+            .Where(name => name.Length > 0)
+            .Distinct();
+        return string.Join("|", names);
+    }
+
+    /// <summary>投资策略输入框的格式说明</summary>
     public string SelectedStrategyInvestHint
     {
         get
         {
             var recommend = Cache.Strategies
                 .ElementAtOrDefault(CosmicStrifeConfig.CurrencyWarsStrategyIndex)?.RecommendInvestStrategies;
-            return string.IsNullOrWhiteSpace(recommend) ? "" : $"推荐：{recommend}";
+            return string.IsNullOrWhiteSpace(recommend)
+                ? "格式：| 分隔＝任一命中即可（越靠左越优先）；; 分隔＝按阶段依次指定。"
+                : "已按攻略带入（越靠左越优先）；| 分隔＝任一命中即可，; 分隔＝按阶段依次指定。";
         }
     }
 

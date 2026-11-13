@@ -61,7 +61,9 @@ Please note that, according to miHoYo's [Fair Gaming Declaration for Honkai: Sta
   * Automatically stops when the weekly points cap is reached, and claims the points rewards.
 * 🎲 **Currency Wars**
   * Automate Standard and Overclock matches (the highest difficulty is not always winnable)
-  * Opening reroll: supports any investment environment, investment strategy, Boss name, and Boss affixes, e.g. Jimi and Aventurine
+  * Opening reroll: supports any investment environment, investment strategy, Boss name, and Boss affixes, e.g. Jimi and Aventurine; selecting a guide also fills in its recommended environments and investment strategies
+  * Stops the task right before the final stage of the third plane (3-7 boss) and emails the investment environments and strategies picked this run; the game stays on the preparation screen for manual takeover
+  * Unattended alerts: sends an email on task exceptions, long stalls, staying on the same stage too long, or an overly long single run; shares the Settings → Notifications → Email toggle with the 3-7 stop alert, so turning it off silences all alert emails (SMTP must also be configured)
 * 🚪 **Exit the game**
   * Optionally exit SRA and shut down the computer.
 * 📖 **Auto story mode**

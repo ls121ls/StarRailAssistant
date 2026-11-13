@@ -38,7 +38,18 @@ if (-not (Test-Path $settingsPath)) {
     Write-Host "已写入后端配置：$settingsPath"
 }
 
+# 产物比源码旧：说明上次只编译没生成 exe（输出被占用时会这样），启动的还是旧界面
+$newestSource = Get-ChildItem -Path (Join-Path $projectRoot 'SRAFrontend') -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Extension -in '.cs', '.axaml' -and $_.FullName -notmatch '\\(bin|obj)\\' } |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($newestSource -and $newestSource.LastWriteTime -gt (Get-Item $exePath).LastWriteTime) {
+    Write-Host '警告：SRA.exe 比源码旧，当前启动的是旧版本（改动不会生效）。' -ForegroundColor Yellow
+    Write-Host "  最新源码：$($newestSource.Name)  $($newestSource.LastWriteTime)" -ForegroundColor Yellow
+    Write-Host '  请关掉正在运行的 SRA，然后执行：dotnet build SRAFrontend/SRAFrontend.Desktop/SRAFrontend.Desktop.csproj' -ForegroundColor Yellow
+}
+
 if ($NoLaunch) { return }
 
-# SRA.exe 清单要求管理员权限，通过 RunAs 触发 UAC
+# SRA.exe 清单要求管理员权限，通过 RunAs 触发提权（本机 UAC 为"不提示直接提升"时不会弹窗）
 Start-Process -Verb RunAs -FilePath $exePath -WorkingDirectory (Split-Path -Parent $exePath)
+Write-Host "已启动 SRA：$exePath"

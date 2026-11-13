@@ -109,6 +109,7 @@ class TaskManager(Runner):
                             if self.stop_event.is_set():
                                 return False
                             logger.error(Resources.task_taskFailed(str(task)))
+                            self._notify_task_failure(task)
                             task.on_failed()
                             # 尝试重试
                             if self._recovery.should_retry():
@@ -127,6 +128,7 @@ class TaskManager(Runner):
                             return False
                         # 捕获任务执行中的异常（如未处理的错误）
                         logger.exception(Resources.task_taskCrashed(str(task), str(e)))
+                        self._notify_task_failure(task, e)
                         task.on_failed()
                         # 尝试重试
                         if self._recovery.should_retry():
@@ -181,6 +183,36 @@ class TaskManager(Runner):
             image=screenshot
         )
         return True
+
+    def _notify_task_failure(self, task: BaseTask, error: BaseException | None = None) -> None:
+        """任务异常或失败时发邮件提醒（同一任务同一错误 10 分钟内只发一次）。"""
+        try:
+            from datetime import datetime
+
+            from SRACore.notification.alerts import send_alert_email
+
+            name = str(task)
+            if error is not None:
+                title = f"任务异常：{name}"
+                detail = f"{type(error).__name__}: {error}"
+            else:
+                title = f"任务失败：{name}"
+                detail = "任务返回 False（未抛出异常，通常是界面识别超时或前置条件不满足）"
+            message = (
+                f"{detail}\n"
+                f"时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                "如果开启了自动重试，SRA 会尝试重新执行；否则任务已停止。"
+            )
+            send_alert_email(
+                self.settings_service.settings,
+                title,
+                message,
+                result="failed",
+                dedup_key=f"task-failure|{name}|{detail[:60]}",
+                dedup_seconds=600,
+            )
+        except Exception as err:  # 提醒失败不能影响任务流程
+            logger.warning(f"任务失败提醒发送异常：{err}")
 
     def _create_start_game_task(self, config_name: str) -> BaseTask | None:
         """创建 StartGameTask 实例（用于重试时启动游戏）"""

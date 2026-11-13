@@ -1,6 +1,7 @@
 import enum
 import json
 import re
+import threading
 import time
 from collections.abc import Callable
 from typing import Any
@@ -33,6 +34,33 @@ class CurrencyWarsPage(enum.IntEnum):
 EQUIPMENT_ROUNDS = frozenset({(1, 4), (1, 9), (2, 4), (2, 7), (3, 4), (3, 7)})
 # 每个角色最多穿戴3件装备
 MAX_EQUIPMENT_PER_CHARACTER = 3
+# 启动时若游戏正处于战斗中，等待战斗结束的最长时间（秒）
+BATTLE_WAIT_TIMEOUT = 600
+# 「第三位面最后一个关卡」的备战阶段：进入该关卡前直接停止任务，并邮件汇报本局投资情况
+FINAL_STAGE_ROUND = (3, 7)
+# 是否启用「最终关卡前停止任务」。需要全程托管时改成 False 即可
+STOP_BEFORE_FINAL_STAGE = True
+# ---- 无人值守告警阈值（秒），触发后发邮件提醒 ----
+# 监控线程检查间隔
+WATCHDOG_INTERVAL_SECONDS = 30
+# 连续这么久没有任何推进 => 判定为「长时间等待/疑似卡住」（单场战斗超时是 600 秒，这里留出余量）
+STALL_ALERT_SECONDS = 900
+# 同一个备战关卡停留这么久 => 判定为「长时间执行同一任务」
+SAME_ROUND_ALERT_SECONDS = 1200
+# 单局运行这么久 => 提醒一次「本局耗时过长」，避免多局配置被误报
+GAME_LONG_ALERT_SECONDS = 3600
+
+
+def _looks_like_character_name(name: str) -> bool:
+    """判断 OCR 文本是否可能为角色名，过滤道具数量等界面噪声。
+
+    未打开角色面板时，名称识别区域可能读到右上角道具栏的数量角标（如“1”），
+    这类文本既不是已收录角色，也不含汉字，不能当作角色处理，
+    否则会在备战席中产生无法清除的幽灵角色。
+    """
+    if Characters.get_character(name) is not None:
+        return True
+    return len(name) >= 2 and re.search(r"[\u4e00-\u9fff]", name) is not None
 
 
 class StageName(enum.StrEnum):
@@ -108,6 +136,22 @@ class CurrencyWars(Executable):
         self.is_continue = False  # 是否是继续挑战
         self.is_game_over = False
         self.skip_current_round = False  # 前台无角色时跳过本轮剩余流程，直接刷新角色并开始新一轮
+        self.stopped_before_final_stage = False  # 是否已在最终关卡前主动停止任务
+        self.selected_invest_environments: list[str] = []  # 本局选过的投资环境
+        self.selected_invest_strategies: list[str] = []  # 本局选过的投资策略
+        self.invest_strategy_misses = 0  # 未命中候选、按收藏卡/中间卡兜底的次数
+        # ---- 无人值守监控（异常 / 长时间等待 / 同一关卡过久 / 单局过久 都会发邮件）----
+        self._watchdog_stop = threading.Event()
+        self._watchdog_thread: threading.Thread | None = None
+        self._task_started_at = time.monotonic()
+        self._game_started_at = 0.0
+        self._last_progress_at = time.monotonic()
+        self._progress_note = "任务启动"
+        self._current_round: tuple[int, int] | None = None
+        self._round_since = 0.0
+        self._stall_alerted = False
+        self._same_round_alerted = False
+        self._long_game_alerted = False
         self.difficulty: int = Difficulty.LOWEST
         self.on_field_character: list[Character | None] = [None, None, None, None]  # 前台角色列表
         self.on_field_area: list[tuple[float, float]] = [
@@ -153,10 +197,18 @@ class CurrencyWars(Executable):
         self.strategy_characters: dict[str, int] = dict()  # 在攻略中的角色及其预期星级
         self.strategy_code = ""  # 当前使用的攻略代码
         self.strategy_special_events: dict[str, str] = dict()  # 攻略中的特殊事件处理
+        self.recommend_invest_strategies: tuple[str, ...] = ()  # 攻略推荐的投资策略（分号分隔，越靠前越优先）
         self.is_overclock = False  # 超频博弈
         self.is_complex_invest_strategy_selection_enabled = False  # 是否启用复杂投资策略选择逻辑
 
     def run(self):
+        self._start_health_monitor()
+        try:
+            return self._run()
+        finally:
+            self._stop_health_monitor()
+
+    def _run(self):
         self.is_running = True
         if self.runtimes == 0:
             logger.warning("货币战争运行次数为 0 ，本次将跳过运行。")
@@ -170,16 +222,32 @@ class CurrencyWars(Executable):
             if not self.is_running:
                 break
             logger.info(f"第{i + 1}次进入货币战争，剩余{self.runtimes - i - 1}次")
+            self._game_started_at = time.monotonic()
+            self._long_game_alerted = False
+            self._mark_progress(f"第{i + 1}局开始")
             try:
                 if self.start_game():
                     self.game_loop()
+                    if self.stopped_before_final_stage:
+                        break
                     if not self.should_continue_next_round():
                         break
             except Exception as e:
                 logger.error(e)
+                self._notify_exception(e)
                 return False
+        if self.stopped_before_final_stage:
+            # 最终关卡前已按配置停止任务：保留现场、不做任何收尾操作
+            logger.info("已按最终关卡停止要求结束任务，游戏停留在备战界面")
+            # 已置位停止事件时返回 False，任务队列不会再执行后续任务，界面状态显示为「已停止」
+            return not self._is_stop_requested()
         self.handle_ending()
         return True
+
+    def _is_stop_requested(self) -> bool:
+        """停止事件是否已置位（界面点「停止任务」或本任务主动停止）"""
+        stop_event = getattr(getattr(self, "operator", None), "stop_event", None)
+        return stop_event is not None and stop_event.is_set()
 
     def should_continue_next_round(self) -> bool:
         """ 一局结束后是否继续进入下一局。默认继续，子类可重写
@@ -270,6 +338,55 @@ class CurrencyWars(Executable):
             logger.error("[页面定位] 检测超时，未识别到任何目标页面")
             return CurrencyWarsPage.UNKNOWN
 
+    def _wait_battle_finish(self) -> bool:
+        """启动时若游戏正处于战斗中，等待战斗结束并推进战后流程。
+
+        仅在页面定位失败时调用。战斗画面不一定出现 Q 键提示，因此只要画面
+        持续无法识别就保持轮询，直到战斗结算出现或超时。
+
+        :return: True-当前战斗已结束且战后流程已处理，可重新定位页面；
+                 False-等待超时，未识别到战斗结束
+        """
+        page_templates = [IMG.ENTER, CWIMG.START_CURRENCY_WARS,
+                          CWIMG.PREPARATION_STAGE, DUIMG.BONUS_POINTS]
+        battle_templates = [IMG.Q, CWIMG.SETTLE, CWIMG.CONTINUE]
+        templates = page_templates + battle_templates
+        logger.info("[启动流程] 未识别到已知页面，检查游戏是否正处于战斗中")
+        start_time = time.monotonic()
+        next_log_time = start_time + 30
+        combat_logged = False
+        while time.monotonic() - start_time < BATTLE_WAIT_TIMEOUT:
+            index, _ = self.operator.locate_any(templates, trace=False)
+            if 0 <= index < len(page_templates):
+                logger.info("[启动流程] 重新识别到已知页面，结束战斗等待")
+                return True
+            if index == len(page_templates):  # IMG.Q：入战提示
+                if not combat_logged:
+                    logger.info("[启动流程] 检测到游戏正处于战斗中，等待战斗结束")
+                    combat_logged = True
+            elif index != -1:  # CWIMG.SETTLE / CWIMG.CONTINUE：战斗结算界面
+                logger.info("[启动流程] 检测到战斗已结束，继续战后流程")
+                return self._continue_after_battle()
+            self.operator.sleep(1)
+            if time.monotonic() >= next_log_time:
+                logger.info(f"[启动流程] 仍在等待战斗结束（已等待{int(time.monotonic() - start_time)}秒）")
+                next_log_time += 30
+        logger.error(f"[启动流程] 等待战斗结束超时（{BATTLE_WAIT_TIMEOUT}秒）")
+        return False
+
+    def _continue_after_battle(self) -> bool:
+        """点击战斗结算的继续按钮，并按正常节奏处理战后的关卡切换与商店流程。"""
+        self.operator.sleep(0.5)
+        if not self.operator.click_point(0.5, 0.824, after_sleep=1, tag="点击继续按钮"):
+            logger.error("[启动流程] 点击战斗结算继续按钮失败")
+            return False
+        self.stage_transition()
+        if self.is_game_over:
+            logger.info("[启动流程] 当前对局已结束，重新进入对局")
+        else:
+            self.shopping()
+        return True
+
     def start_game(self):
         """开始一局货币战争。
         拆分原复杂流程为多个独立步骤，提升可读性与可维护性。
@@ -277,6 +394,9 @@ class CurrencyWars(Executable):
             False 表示流程中断或失败。
         """
         page = self.page_locate()
+        if page == CurrencyWarsPage.UNKNOWN and self._wait_battle_finish():
+            # 游戏正在战斗中：等待结算并推进战后流程后重新定位
+            page = self.page_locate()
         if page == CurrencyWarsPage.UNKNOWN:
             logger.error("[启动流程] 页面定位失败，无法开始游戏")
             return False
@@ -573,7 +693,15 @@ class CurrencyWars(Executable):
 
     def game_loop(self):
         run_times = 0
+        # 从存档继续时，第一场战斗前不会走到循环末尾的备战关卡读取，这里先补一次判断
+        first_round = self._read_preparation_round()
+        if first_round is not None:
+            self._note_round(first_round)
+        if first_round is not None and self._should_stop_before_final_stage(first_round):
+            self.stop_before_final_stage(first_round)
+            return True
         while self.is_running:
+            self._mark_progress()
             self.harvest_crystals()
             self.get_in_hand_area(True)  # 更新备战席信息
             self.handle_characters_updated()
@@ -597,6 +725,7 @@ class CurrencyWars(Executable):
             run_times += 1
             current_round = self._read_preparation_round()
             if current_round is not None:
+                self._note_round(current_round)
                 is_equipment_round = current_round in EQUIPMENT_ROUNDS
             else:
                 # 备战关卡未识别时按战斗间隔兜底，避免整局不检查装备
@@ -607,9 +736,236 @@ class CurrencyWars(Executable):
                 self.sort_all_areas_by_priority()  # 优先级排序
             elif run_times % 2 == 0:  # 每2轮更新一次前台角色信息，不打开装备面板
                 self.refresh_character(equip=False)
+
+            # 装备、商店都已处理完，下一轮就是要打的关卡：第三位面最终关卡前停止任务并通知
+            if current_round is not None and self._should_stop_before_final_stage(current_round):
+                self.stop_before_final_stage(current_round)
+                break
         # 游戏循环结束，重置角色状态
         self.reset_character()
         return True
+
+    def _should_stop_before_final_stage(self, current_round: tuple[int, int]) -> bool:
+        """是否应在「第三位面最后一个关卡」的备战阶段停止任务"""
+        if not STOP_BEFORE_FINAL_STAGE or self.stopped_before_final_stage:
+            return False
+        return tuple(current_round) == FINAL_STAGE_ROUND
+
+    # ------------------------------------------------------------------
+    # 无人值守监控：异常 / 长时间等待 / 长时间停留在同一关卡 / 单局过久
+    # ------------------------------------------------------------------
+
+    def _start_health_monitor(self) -> None:
+        """启动后台监控线程（只在 run() 期间存活）。"""
+        now = time.monotonic()
+        self._task_started_at = now
+        self._game_started_at = now
+        self._last_progress_at = now
+        self._round_since = now
+        self._current_round = None
+        self._progress_note = "任务启动，等待进入对局"
+        self._stall_alerted = False
+        self._same_round_alerted = False
+        self._long_game_alerted = False
+        self._watchdog_stop = threading.Event()
+        thread = threading.Thread(target=self._health_monitor_loop, name="cw-watchdog", daemon=True)
+        self._watchdog_thread = thread
+        thread.start()
+        logger.debug("无人值守监控已启动（阈值：无进展 15 分钟 / 同一关卡 20 分钟 / 单局 60 分钟）")
+
+    def _stop_health_monitor(self) -> None:
+        stop = getattr(self, "_watchdog_stop", None)
+        if stop is not None:
+            stop.set()
+
+    def _mark_progress(self, note: str = "") -> None:
+        """任务心跳：每完成一轮可观测的推进时调用，用于区分「在推进」和「卡住」。"""
+        self._last_progress_at = time.monotonic()
+        self._stall_alerted = False
+        if note:
+            self._progress_note = note
+
+    def _note_round(self, current_round: tuple[int, int]) -> None:
+        """记录当前备战关卡，用于检测「长时间停在同一个关卡」。"""
+        current_round = (int(current_round[0]), int(current_round[1]))
+        if current_round != self._current_round:
+            self._current_round = current_round
+            self._round_since = time.monotonic()
+            self._same_round_alerted = False
+        self._progress_note = f"第{current_round[0]}位面 {current_round[0]}-{current_round[1]}"
+
+    def _health_monitor_loop(self) -> None:
+        while not self._watchdog_stop.wait(WATCHDOG_INTERVAL_SECONDS):
+            try:
+                self._check_health()
+            except Exception as err:  # 监控自身异常不影响任务
+                logger.debug(f"监控检查异常（忽略）：{err}")
+
+    def _check_health(self) -> None:
+        now = time.monotonic()
+        # 人工停止 / 任务已结束属于预期状态，不告警，并把基准时间推后
+        if self.stopped_before_final_stage or not self.is_running:
+            self._last_progress_at = now
+            self._game_started_at = now
+            return
+
+        idle = now - self._last_progress_at
+        if idle >= STALL_ALERT_SECONDS and not self._stall_alerted:
+            self._stall_alerted = True
+            self._send_health_alert(
+                "货币战争长时间无进展",
+                f"已经 {int(idle // 60)} 分钟没有检测到任何推进，可能卡在等待界面或图片识别。\n"
+                f"当前阶段：{self._progress_note}\n"
+                f"{self._invest_summary()}\n"
+                "如果游戏界面正常，请人工确认后决定是否继续。",
+                dedup_key=f"cw-stall|{self._progress_note}",
+            )
+
+        if (self._current_round is not None and not self._same_round_alerted
+                and now - self._round_since >= SAME_ROUND_ALERT_SECONDS):
+            self._same_round_alerted = True
+            self._send_health_alert(
+                "货币战争长时间停留在同一关卡",
+                f"已经在「{self._progress_note}」停留 {int((now - self._round_since) // 60)} 分钟，"
+                "可能在反复重试或战斗没有正常结束。\n"
+                f"本局已运行：{int((now - self._game_started_at) // 60)} 分钟\n"
+                f"{self._invest_summary()}",
+                dedup_key=f"cw-round|{self._current_round}",
+            )
+
+        if not self._long_game_alerted and now - self._game_started_at >= GAME_LONG_ALERT_SECONDS:
+            self._long_game_alerted = True
+            self._send_health_alert(
+                "货币战争单局运行时间过长",
+                f"本局已连续运行 {int((now - self._game_started_at) // 60)} 分钟。\n"
+                f"当前阶段：{self._progress_note}\n"
+                f"{self._invest_summary()}\n"
+                "如果这不是预期行为，请检查游戏界面或停止任务。",
+                dedup_key="cw-long-game",
+                result="running",
+            )
+
+    def _notify_exception(self, error: BaseException) -> None:
+        """任务异常终止时发邮件：带上阶段、已选投资和最近的调用栈。"""
+        import traceback
+
+        summary = "".join(traceback.format_exception_only(type(error), error)).strip()
+        stack = traceback.format_exc(limit=8)
+        message = (
+            "货币战争任务异常终止，自动化已停止。\n"
+            f"当前阶段：{self._progress_note}\n"
+            f"{self._invest_summary()}\n"
+            f"异常：{summary}\n"
+            f"最近调用栈：\n{stack[-1500:]}"
+        )
+        logger.error(f"任务异常：{summary}")
+        self._send_health_alert(
+            "货币战争任务异常",
+            message,
+            dedup_key=f"cw-exception|{type(error).__name__}|{str(error)[:60]}",
+        )
+
+    def _send_health_alert(self, title: str, message: str, *, dedup_key: str, result: str = "timeout") -> None:
+        """统一出口：日志 + 邮件（后台线程发送，不阻塞任务）。"""
+        logger.warning(f"{title}：{message.splitlines()[0] if message else ''}")
+        try:
+            from SRACore.notification.alerts import send_alert_email
+
+            send_alert_email(
+                self.settings,
+                title,
+                message,
+                result=result,
+                dedup_key=dedup_key,
+                async_send=True,
+            )
+        except Exception as err:  # 邮件失败不影响任务
+            logger.warning(f"提醒邮件发送异常：{err}")
+
+    def _record_invest_environment(self, name: str) -> None:
+        """记录本局选中的投资环境（去重）"""
+        name = (name or "").strip()
+        if not name or name in self.selected_invest_environments:
+            return
+        self.selected_invest_environments.append(name)
+        logger.info(f"本局已选投资环境：{name}")
+
+    def _record_invest_strategy(self, name: str) -> None:
+        """记录本局选中的投资策略（去重）"""
+        name = (name or "").strip()
+        if not name or name in self.selected_invest_strategies:
+            return
+        self.selected_invest_strategies.append(name)
+        logger.info(f"本局已选投资策略：{name}")
+
+    def _invest_summary(self) -> str:
+        """本局已选投资环境与投资策略的文字摘要"""
+        lines = [
+            "投资环境：" + ("、".join(self.selected_invest_environments) or "未记录"),
+            "投资策略：" + ("、".join(self.selected_invest_strategies) or "未记录"),
+        ]
+        if self.invest_strategy_misses:
+            lines.append(f"备注：有 {self.invest_strategy_misses} 次没刷到候选策略，按收藏卡/中间卡兜底选择")
+        return "\n".join(lines)
+
+    def stop_before_final_stage(self, current_round: tuple[int, int]) -> None:
+        """第三位面最终关卡前直接停止任务：发邮件告知已选的投资环境与投资策略，然后结束自动化
+
+        停止后游戏停留在备战界面，不做任何退出/按键操作，可直接人工接手。
+        """
+        self.stopped_before_final_stage = True
+        self.is_running = False  # 让 game_loop / run 的循环条件立即结束
+        plane, node = current_round
+        message = (
+            f"货币战争即将进入第{plane}位面的最后一个关卡（{plane}-{node} 首领），已按要求停止任务。\n"
+            f"{self._invest_summary()}\n"
+            "游戏仍停留在备战界面，未做任何退出操作，可直接人工接手。"
+        )
+        logger.warning("=" * 64)
+        for line in message.splitlines():
+            logger.warning(line)
+        logger.warning("=" * 64)
+        self._send_stop_mail(message)
+        # 置位停止事件：任务队列不会继续执行后续任务，界面状态显示为「已停止」
+        stop_event = getattr(getattr(self, "operator", None), "stop_event", None)
+        if stop_event is not None:
+            stop_event.set()
+        logger.warning("已在最终关卡前停止任务，游戏停留在备战界面")
+
+    def _send_stop_mail(self, message: str) -> None:
+        """发送停止提醒（受「设置 → 通知 → 邮件」开关控制）：邮件为主，桌面通知兜底。
+
+        开关关闭时整条提醒链路静默，投资摘要仍会逐行写进日志，不影响停止本身。
+        """
+        try:
+            from SRACore.notification.channels.email import EmailChannel
+            from SRACore.notification.channels.system import SystemChannel
+            from SRACore.notification.models import NotificationContext
+            from SRACore.notification.service import build_notification_payload
+
+            config = self.settings.Notification
+            if not getattr(config, "isEmailEnabled", False):
+                logger.info("邮件提醒已关闭，本次停止提醒仅记录日志（设置 → 通知 → 邮件 可打开）")
+                return
+
+            payload = build_notification_payload("货币战争停止", message, "info")
+            context = NotificationContext(
+                title="SRA",
+                message=message,
+                payload=payload,
+                settings=config,
+            )
+            if EmailChannel().send(context):
+                logger.info("停止提醒邮件已发送")
+            else:
+                logger.warning("停止提醒邮件发送失败：请在 设置 → 通知 → 邮件 里填写 SMTP 服务器、发件人、授权码和收件人")
+            # 桌面通知兜底：邮件通道没配置时也能看到提醒
+            try:
+                SystemChannel().send(context)
+            except Exception as err:
+                logger.debug(f"系统通知发送失败（忽略）：{err}")
+        except Exception as err:  # 通知失败不能影响停止本身
+            logger.warning(f"停止提醒发送异常：{err}")
 
     def _read_preparation_round(self) -> tuple[int, int] | None:
         """OCR识别左上角"备战阶段 X-Y"标签，返回(位面, 节点)；无法识别时返回None。"""
@@ -816,17 +1172,19 @@ class CurrencyWars(Executable):
                     to_x=ocr_to_x,
                     to_y=ocr_to_y
                 )
+                name = _merge_ocr_text(character_names) if character_names else ""
 
-                if not character_names and use_backup_ocr:
-                    # 狸猫/佩佩等可能需要在另一个位置识别
-                    ocr_from_x2, ocr_from_y2, ocr_to_x2, ocr_to_y2 = (0.775, 0.445, 0.880, 0.486)
-                    # 尝试在备用区域识别角色名称
-                    character_names = self.operator.ocr(
-                        from_x=ocr_from_x2,
-                        from_y=ocr_from_y2,
-                        to_x=ocr_to_x2,
-                        to_y=ocr_to_y2
+                if use_backup_ocr and not _looks_like_character_name(name):
+                    # 主区域未读到有效名称时尝试备用区域，狸猫/佩佩等角色名称可能显示在其他位置
+                    backup_names = self.operator.ocr(
+                        from_x=0.775,
+                        from_y=0.445,
+                        to_x=0.880,
+                        to_y=0.486
                     )
+                    if backup_names:
+                        character_names = backup_names
+                        name = _merge_ocr_text(backup_names)
 
                 # 更新角色列表
                 # 空位背景常被误识别为“1”等数字/符号，只保留包含文字的片段
@@ -930,12 +1288,15 @@ class CurrencyWars(Executable):
                 logger.info("备战席未满，跳过出售角色")
                 return True
             logger.info("备战席已满，尝试出售角色")
-            self._handle_sell_character()
+            if not self._handle_sell_character():
+                # 常规条件下没有可出售目标，重复扫描只会得到同样结果，直接进入强制出售
+                logger.info("没有符合出售条件的角色，提前进入强制出售流程")
+                break
             self.get_in_hand_area()  # 检测空位，确保没有新插入的角色
             attempt += 1
 
         # 超过最大尝试次数仍未成功出售时的逻辑
-        logger.warning(f"已尝试{max_attempts}次出售角色，备战席仍为满状态，将强制执行出售")
+        logger.warning(f"已尝试{attempt}次出售角色，备战席仍为满状态，将强制执行出售")
         self._handle_sell_character(force=True)
         self.get_in_hand_area()  # 最后更新备战席状态
 
@@ -946,10 +1307,11 @@ class CurrencyWars(Executable):
             logger.error("强制出售角色失败，备战席仍为满状态")
             return False
 
-    def _handle_sell_character(self, force=False):
+    def _handle_sell_character(self, force=False) -> bool:
         """
         角色出售逻辑
         :param force: bool - 是否强制出售所有角色（包括已放置的角色）
+        :return: 是否存在可出售角色
         """
         # 创建需要出售的角色索引列表
         characters_to_sell: list[tuple[int, Character]] = []
@@ -982,6 +1344,7 @@ class CurrencyWars(Executable):
             logger.info(f"已出售角色：{character.name}")
             self.operator.sleep(0.5)
         logger.info("出售操作完成")
+        return len(characters_to_sell) > 0
 
     def battle(self) -> bool:
         # 按钮偶现点击不生效：点击后需确认按钮消失，未消失则重试
@@ -1538,6 +1901,13 @@ class CurrencyWars(Executable):
         self.mid_level = strategy_data.get("mid_level", 7)
         self.strategy_code = strategy_data.get("share_code", "")
         self.strategy_special_events = strategy_data.get("special_events", {})
+        # 攻略推荐的投资策略：分号（含全角）分隔、按优先级排列，与 cw_plus 的解析口径保持一致
+        self.recommend_invest_strategies = tuple(
+            name
+            for name in (re.sub(r"\s+", "", item) for item in
+                         re.split(r"[;；\n]+", str(strategy_data.get("recommend_invest_strategies") or "")))
+            if name
+        )
         # 在攻略中的角色设置成最高优先级
         strategy_on_field: dict[str, int] = strategy_data.get("on_field", {})
         strategy_off_field: dict[str, int] = strategy_data.get("off_field", {})
@@ -1580,6 +1950,7 @@ class CurrencyWars(Executable):
         self.mid_level = 7
         self.strategy_characters.clear()
         self.strategy_code = ""
+        self.recommend_invest_strategies = ()
         logger.info("已卸载当前攻略，角色优先级已重置")
 
     def place_character(self) -> bool:

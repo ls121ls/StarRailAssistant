@@ -54,6 +54,8 @@ class CosmicStrifeTask(BaseTask):
             rs_task.set_boss_affix(self.config.CosmicStrife.currencyWarsRerollBossAffixes)
             rs_task.set_invest_env(self.config.CosmicStrife.currencyWarsRerollInvestEnvironments)
             rs_task.set_invest_strategy(self.config.CosmicStrife.currencyWarsRerollInvestStrategies)
+            # 未单独配置投资策略时，沿用所选攻略推荐的投资策略（按优先级三选一，都没有就刷新）
+            rs_task.apply_strategy_recommendations()
             if not rs_task.run():
                 logger.error("旷宇纷争-货币战争刷开局任务失败")
                 return False

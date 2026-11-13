@@ -102,16 +102,26 @@ class StartGameTask(BaseTask):
         if self.operator.type == "Browser":
             self.operator.launch(0, "")
             return
-        if self.config.StartGame.isUseGlobalGamePath:
-            game_path_index = self.settings.General.gamePathIndex
-            game_paths: list[str] = self.settings.General.gamePaths
-            raw_path = game_paths[game_path_index] if game_path_index < len(game_paths) else None
-        else:
-            raw_path = self.config.StartGame.gamePath
+        raw_path = self._resolve_game_path()
         if not raw_path:
-            logger.error("未设置游戏启动路径")
+            logger.error("未设置游戏启动路径：请在「启动游戏」任务中打开「使用全局设置」，或手动填写 StarRail.exe 的路径")
             raise ValueError("未设置游戏启动路径")
         self.operator.launch(channel=self.config.StartGame.gameChannel, path=raw_path)
+
+    def _resolve_game_path(self) -> str:
+        """解析游戏启动路径：任务内路径为空时回退到全局设置，避免整轮任务直接失败"""
+        game_paths: list[str] = self.settings.General.gamePaths
+        index = self.settings.General.gamePathIndex
+        global_path = game_paths[index] if 0 <= index < len(game_paths) else ""
+        task_path = self.config.StartGame.gamePath
+        if self.config.StartGame.isUseGlobalGamePath:
+            return global_path
+        if task_path:
+            return task_path
+        if global_path:
+            logger.warning(f"未填写任务内的游戏路径，回退使用全局设置：{global_path}")
+        return global_path
+
 
     def login(self) -> int:
         """登录游戏

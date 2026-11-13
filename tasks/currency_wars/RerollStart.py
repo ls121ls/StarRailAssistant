@@ -1,10 +1,45 @@
 # noinspection package-requirements
+import re
+
 from typing_extensions import deprecated
 
 from SRACore.util import strutil
 from SRACore.util.logger import logger
 from tasks.img import CWIMG, IMG
 from .CurrencyWars import CurrencyWars, StageName
+
+
+class PriorityMatcher(strutil.StrMatcher):
+    """同一阶段内的多个候选投资策略，命中越靠前的候选优先级越高。
+
+    配置中用 ``|`` 分隔候选，例如 ``A|B|C`` 表示三选一里出现任意一张即可，
+    并且按 A → B → C 的顺序优先选择。攻略推荐的投资策略表（分号分隔、越靠前越优先）
+    也会被转换成这种形式，见 :meth:`RerollStart.apply_strategy_recommendations`。
+    """
+
+    SEPARATOR = re.compile(r"[|｜]")
+    # 卡名末尾的叹号经常被 OCR 漏掉（如「艾丝妲的猛犬！」），匹配时统一去掉
+    TRAILING_PUNCTUATION = "!！?？"
+
+    def __init__(self, value: str):
+        names = (strutil.clean_text(item).rstrip(self.TRAILING_PUNCTUATION)
+                 for item in self.SEPARATOR.split(strutil.normalize_unicode(value)))
+        self.names = [name for name in names if name]
+        super().__init__("|".join(self.names))
+
+    def __bool__(self) -> bool:
+        return bool(self.names)
+
+    def match(self, other: str) -> bool:
+        return self.priority(other) is not None
+
+    def priority(self, other: str) -> int | None:
+        """返回命中的候选下标，未命中返回 None；下标越小优先级越高。"""
+        text = strutil.clean_text(strutil.normalize_unicode(other))
+        for index, name in enumerate(self.names):
+            if name in text:
+                return index
+        return None
 
 
 class RerollStart(CurrencyWars):
@@ -44,6 +79,9 @@ class RerollStart(CurrencyWars):
         self.invest_strategy_stage = 0  # 投资策略阶段
         self.invest_strategy_satisfied = False  # 满意标志
         self.opening_satisfied = False  # 是否已刷到理想开局（此后转为按攻略打完整局）
+        self.recommended_strategy_matcher: PriorityMatcher | None = None  # 开局达成后三选一时优先沿用的候选表
+        self._detected_env_names: list[str] = []  # 最近一次识别到的投资环境名称（与下标对应）
+        self._last_strategy_cards: list[str] = []  # 最近一次识别到的三张投资策略卡名
 
     def handle_ending(self):
         # 未刷到理想开局时保持现状：不结算也不退出，把局面留给人工接手
@@ -82,11 +120,13 @@ class RerollStart(CurrencyWars):
 
     def set_invest_strategy(self, invest_strategy: str):
         """设置投资策略
-        
+
         投资策略使用分号分隔，按照顺序分别对应阶段1、阶段2...
+        同一阶段内可用 `|` 分隔多个候选：三选一里出现任意一张即可，越靠左越优先。
         留空表示该阶段无要求。
         例如：
         - "策略1;策略2"：阶段1需要策略1，阶段2需要策略2
+        - "策略1|策略2"：阶段1的候选为策略1、策略2，命中任意一张即算满足
         - ";策略2"：阶段1无要求，阶段2需要策略2
         - "策略1;"：阶段1需要策略1，满足后即达成理想开局，按攻略打完整局
         """
@@ -97,7 +137,40 @@ class RerollStart(CurrencyWars):
         # 去除末尾空字符串（如"策略1;"会分割为["策略1", ""]）
         if stages[-1] == "":
             stages.pop()
-        self.wanted_invest_strategies = [strutil.RegexMatcher(strutil.clean_text(s)) for s in stages]
+        matchers = [self._build_strategy_matcher(stage) for stage in stages]
+        self.wanted_invest_strategies = matchers
+        # 显式配置了候选表时，开局达成后的三选一也按它优先挑选
+        priority_matcher = next((m for m in matchers if isinstance(m, PriorityMatcher)), None)
+        if priority_matcher is not None:
+            self.recommended_strategy_matcher = priority_matcher
+
+    @staticmethod
+    def _build_strategy_matcher(stage: str) -> strutil.StrMatcher:
+        """构造单个阶段的匹配器：含 `|` 候选时按优先级匹配，否则沿用原来的正则匹配。"""
+        if re.search(r"[|｜]", stage):
+            matcher = PriorityMatcher(stage)
+            if matcher:
+                return matcher
+        return strutil.RegexMatcher(strutil.clean_text(stage))
+
+    def apply_strategy_recommendations(self) -> bool:
+        """未显式配置投资策略时，沿用所选攻略推荐的投资策略。
+
+        攻略里的推荐表是按优先级排列的候选（分号分隔），含义是「三选一里出现其中任意一张
+        即可，越靠前越优先」，因此合并成单阶段的候选表：阶段1命中任意一张即视为理想开局，
+        之后的投资策略三选一继续按这张表优先挑选（不刷新）。
+
+        :return: True-已应用攻略推荐；False-攻略无推荐或已显式配置投资策略
+        """
+        recommendations = self.recommend_invest_strategies
+        if not recommendations:
+            return False
+        self.recommended_strategy_matcher = PriorityMatcher("|".join(recommendations))
+        if self.wanted_invest_strategies:
+            return False
+        self.wanted_invest_strategies = [self.recommended_strategy_matcher]
+        logger.info(f"未配置投资策略，沿用攻略推荐：{'、'.join(recommendations)}")
+        return True
 
     def set_boss_name(self, boss_names: str):
         """
@@ -152,6 +225,8 @@ class RerollStart(CurrencyWars):
                 self.operator.click_point(0.25 * (result + 1), 0.27, tag="投资环境", trace=True)  # 根据投资环境的位置计算点击坐标，每个环境占屏幕宽度的25%
                 self.operator.click_img(IMG.ENSURE2, after_sleep=1)
                 logger.info("投资环境符合要求，继续游戏...")
+                if 0 <= result < len(self._detected_env_names):
+                    self._record_invest_environment(self._detected_env_names[result])
                 break
             
             logger.info("投资环境不符合要求，尝试刷新...")
@@ -193,16 +268,71 @@ class RerollStart(CurrencyWars):
         super().handle_invest_strategy(prev_stage=prev_stage)
         return False
 
-    def handle_invest_strategy(self, prev_stage: StageName | None) -> bool:
-        def default_invest_strategy_handler():
-            # 当前阶段的必需策略未匹配到，直接重开
-            logger.info(f"阶段{self.invest_strategy_stage}投资策略未满足要求，准备重开...")
-            self.operator.click_img(CWIMG.BACK_PREPARE_PAGE, after_sleep=0.5)
-            self.abort_and_return()
-            self.invest_strategy_stage = 0
+    def _record_fallback_strategy(self) -> None:
+        """记录兜底选择（收藏卡/中间卡）：OCR 结果里能对上就记卡名"""
+        self.invest_strategy_misses += 1
+        if self.operator.locate(CWIMG.COLLECTION):
+            name = "收藏卡（未刷到候选）"
+        elif len(self._last_strategy_cards) > 1:
+            name = self._last_strategy_cards[1]
+        else:
+            name = "中间卡（未刷到候选）"
+        logger.info(f"未命中候选，按兜底选择：{name}")
+        self._record_invest_strategy(name)
 
-        # 已刷到理想开局：后续弹出的投资策略交给基础逻辑，继续打完整局
+    # 投资策略界面是三张卡各带一个刷新按钮（用掉即消失），一屏共 3 次刷新机会
+    INVEST_STRATEGY_REFRESH_TIMES = 3
+
+    def _select_invest_strategy(self, matcher: strutil.StrMatcher, desc: str) -> bool:
+        """在当前投资策略界面按候选表挑选，没命中就逐个刷新卡牌。
+
+        界面上三张卡各带一个刷新按钮（用掉后图标消失），不是全局刷新：
+        每次 locate_all 取最左边剩下的那个，正好轮流刷新左/中/右三张卡。
+        因此「3 次刷新」需要「4 次识别」——最后一张卡刷完必须再看一眼，
+        否则它刷新后的结果永远不会被识别到。
+
+        :param matcher: 候选表，命中任意一张即选中，越靠左越优先
+        :param desc: 日志里用于区分场景的描述（阶段N / 开局已达成）
+        :return: True-已选中并确认；False-刷新用尽仍未命中
+        """
+        for attempt in range(self.INVEST_STRATEGY_REFRESH_TIMES + 1):
+            logger.info(f"正在识别投资策略（{desc}）...")
+            box = self._detect_invest_strategy(matcher)
+            if box is not None:
+                logger.info("投资策略符合要求，继续游戏...")
+                self.operator.click_box(box)
+                self.operator.click_img(IMG.ENSURE2, after_sleep=1)
+                self._record_invest_strategy(getattr(box, "source", ""))
+                self.post_invest_strategy()
+                return True
+
+            if attempt == self.INVEST_STRATEGY_REFRESH_TIMES:
+                break
+            logger.info(f"投资策略不符合要求（候选：{matcher.value}），正在刷新...")
+            refresh_boxes = self.operator.locate_all(CWIMG.INVEST_STRATEGY_REFRESH)
+            if not refresh_boxes:
+                logger.info("已无刷新次数")
+                break
+            self.operator.click_box(refresh_boxes[0], after_sleep=1)
+        return False
+
+    def _pick_recommended_strategy(self) -> bool:
+        """理想开局达成后：后续每次三选一仍按候选表挑选，未命中同样刷新手上的三张卡。
+
+        :return: True-已选择并确认；False-刷新用尽仍未命中，交由基础逻辑处理
+        """
+        matcher = self.recommended_strategy_matcher
+        if matcher is None:
+            return False
+        return self._select_invest_strategy(matcher, "开局已达成")
+
+    def handle_invest_strategy(self, prev_stage: StageName | None) -> bool:
+        # 已刷到理想开局：后续弹出的投资策略优先按候选表挑选，未命中再交给基础逻辑
         if self.opening_satisfied:
+            if self._pick_recommended_strategy():
+                return False
+            if self.recommended_strategy_matcher is not None:
+                self._record_fallback_strategy()
             super().handle_invest_strategy(prev_stage=prev_stage)
             return False
 
@@ -236,29 +366,20 @@ class RerollStart(CurrencyWars):
                 self._mark_opening_satisfied()
             return False
 
-        for _ in range(3):
-            logger.info(f"阶段{self.invest_strategy_stage}正在识别投资策略...")
-            result = self._detect_invest_strategy(wanted_strategy)
-            if result is None:
-                logger.info("投资策略不符合要求，正在刷新...")
-                boxs = self.operator.locate_all(CWIMG.INVEST_STRATEGY_REFRESH)
-                if boxs is None:
-                    logger.info("已无刷新次数")
-                    break
-                for box in boxs:
-                    self.operator.click_box(box, after_sleep=1)
-            else:
-                logger.info("投资策略符合要求，继续游戏...")
-                self.operator.click_box(result)
-                self.operator.click_img(IMG.ENSURE2, after_sleep=1)
-                # 已是最后一个阶段：理想开局达成，交给游戏循环继续对局
-                if current_stage_index + 1 >= len(self.wanted_invest_strategies):
-                    logger.info("当前阶段满足且无后续要求，转为按攻略继续对局...")
-                    self._mark_opening_satisfied()
-                return True
+        # 刷开局阶段：按当前阶段要求识别 + 刷新，命中即选中
+        if self._select_invest_strategy(wanted_strategy, f"阶段{self.invest_strategy_stage}"):
+            # 已是最后一个阶段：理想开局达成，交给游戏循环继续对局
+            if current_stage_index + 1 >= len(self.wanted_invest_strategies):
+                logger.info("当前阶段满足且无后续要求，转为按攻略继续对局...")
+                self._mark_opening_satisfied()
+            return True
 
-        default_invest_strategy_handler()
-        return True
+        # 三张卡都刷过、且最后一次识别仍未命中：不再重开，按基础逻辑（收藏卡/中间卡）选一张继续对局
+        self._record_fallback_strategy()
+        return self._continue_with_default_strategy(
+            prev_stage,
+            f"阶段{self.invest_strategy_stage}未刷到要求的投资策略（不重开）",
+        )
 
     def handle_stage_transitioned(self) -> bool:
         if self.reroll:
@@ -294,13 +415,21 @@ class RerollStart(CurrencyWars):
 
         # 日志输出识别到的词缀，便于调试
         logger.info(f"识别到投资策略：{detected_invest_strategy}")
+        self._last_strategy_cards = detected_invest_strategy
 
-        # 使用指定的当前阶段策略进行匹配
-        for i, invest_strategy in enumerate(raw_results):
-            if wanted_strategy.match(invest_strategy.source):
-                logger.info(f"检测到需要的投资策略 {invest_strategy.source} (匹配: {wanted_strategy.value})")
-                return invest_strategy
-        return None
+        # 使用指定的当前阶段策略进行匹配：同一阶段有多个候选（`|` 分隔）时，靠左的候选优先
+        best_box = None
+        best_priority = 0
+        priority_of = getattr(wanted_strategy, "priority", None)
+        for invest_strategy in raw_results:
+            if not wanted_strategy.match(invest_strategy.source):
+                continue
+            priority = priority_of(invest_strategy.source) if priority_of else 0
+            if best_box is None or priority < best_priority:
+                best_box, best_priority = invest_strategy, priority
+        if best_box is not None:
+            logger.info(f"检测到需要的投资策略 {best_box.source} (匹配: {wanted_strategy.value})")
+        return best_box
 
     def _detect_boss_affix(self) -> bool:
         """
@@ -419,6 +548,7 @@ class RerollStart(CurrencyWars):
 
         # 日志输出识别到的词缀，便于调试
         logger.info(f"识别到投资环境：{detected_invest_env}")
+        self._detected_env_names = detected_invest_env
         
         # 优先检测必须的投资环境
         assert self.wanted_invest_env, "必须的投资环境不能为空"
