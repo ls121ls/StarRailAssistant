@@ -233,6 +233,8 @@ def read_population_frame(frame, ocr, check_stop, *, enhance=False, on_attempt=N
     duplicate = False
     crop_recovery_needed = False
     low_confidence_seen = False
+    # 上一轮 OCR 的 token；补取外围像素的分支要复用第一轮读到的字形宽度。
+    tokens = ()
     for index, (name, roi, scale, processing) in enumerate(modes):
         if crop_recovery_needed and index == 1:
             # 四/五字计数会从中心向两侧增长。补取原图字形，同时避开
