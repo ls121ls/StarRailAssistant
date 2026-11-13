@@ -47,7 +47,16 @@ MD_PATH = DATA_DIR / "currency_war_investments.md"
 API = "https://wiki.biligame.com/sr/api.php"
 PAGE = "投资策略一览"
 SOURCE_URL = f"https://wiki.biligame.com/sr/{urllib.parse.quote(PAGE)}"
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SRA-wiki-fetch/1.0"
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+# BWIKI 对简易 UA / 缺失 Referer 的请求会返回 HTTP 567；大页面（角色页 ~800KB）
+# 还容易因压缩传输被截断，显式关掉压缩更稳。
+API_HEADERS = {
+    "User-Agent": UA,
+    "Referer": "https://wiki.biligame.com/sr/",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Encoding": "identity",
+}
 
 # 页面筛选区 {{筛选项|1|<码>|<稀有度>}} 决定的稀有度编码
 RARITY_BY_CODE = {"1": "棱彩", "2": "金色", "3": "银色"}
@@ -60,12 +69,12 @@ class FetchFailed(RuntimeError):
 
 # --------------------------------------------------------------------------- 抓取
 
-def api_get(params: dict, retries: int = 3) -> dict:
+def api_get(params: dict, retries: int = 5) -> dict:
     """调用 MediaWiki API；限流（HTTP 567）/网络异常时按退避重试。"""
     query = urllib.parse.urlencode(params)
     last_err = ""
     for attempt in range(1, retries + 1):
-        req = urllib.request.Request(f"{API}?{query}", headers={"User-Agent": UA})
+        req = urllib.request.Request(f"{API}?{query}", headers=API_HEADERS)
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
                 return json.loads(resp.read().decode("utf-8", errors="replace"))
@@ -73,7 +82,7 @@ def api_get(params: dict, retries: int = 3) -> dict:
             # wiki 对连续请求会返回 HTTP 567 限流，按退避重试
             last_err = str(e)
             if attempt < retries:
-                wait = 8 * attempt
+                wait = 4 * attempt
                 print(f"[重试 {attempt}/{retries}] {last_err} -> {wait}s 后重试")
                 time.sleep(wait)
     raise FetchFailed(last_err)
@@ -155,9 +164,14 @@ def parse_rarity_codes(text: str) -> dict[str, str]:
 
 
 def parse_rows(text: str, rarity_codes: dict[str, str]) -> list[dict]:
-    """解析表格行 -> 投资策略记录列表。"""
+    """解析表格行 -> 投资策略记录列表。
+
+    BWIKI 2026-11 改版后行标记由 ``|-class="divsort"`` 变成 ``|- class="divsort"``，
+    这里用 ``[ \\t]*`` 同时兼容两种写法，避免整页解析为 0 条。
+    """
     records: list[dict] = []
-    for m in re.finditer(r'(?m)^\|-class="divsort"([^\n]*)\n(.*?)(?=^\|-|^\|\}|\Z)', text, flags=re.S):
+    row_pattern = r'(?m)^\|-[ \t]*class="divsort"([^\n]*)\n(.*?)(?=^\|-|^\|\}|\Z)'
+    for m in re.finditer(row_pattern, text, flags=re.S):
         attrs, body = m.group(1), m.group(2)
         cells = [c.strip() for c in re.split(r"\|\|", body)]
         if len(cells) != 4:

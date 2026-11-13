@@ -51,7 +51,15 @@ MD_PATH = DATA_DIR / "currency_war_characters.md"
 API = "https://wiki.biligame.com/sr/api.php"
 INDEX_PAGE = "角色一览（货币）"
 SOURCE_URL = f"https://wiki.biligame.com/sr/{urllib.parse.quote(INDEX_PAGE)}"
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SRA-wiki-fetch/1.0"
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+# 角色页渲染 HTML ~800KB，BWIKI 对简易 UA / 无 Referer / 压缩响应容易返回 567
+API_HEADERS = {
+    "User-Agent": UA,
+    "Referer": "https://wiki.biligame.com/sr/",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Encoding": "identity",
+}
 
 # 索引页筛选区 data-option 的组号 -> 羁绊归类
 BOND_GROUP_KIND = {"3": "阵营羁绊", "4": "流派羁绊", "5": "独立羁绊"}
@@ -91,8 +99,8 @@ def fetch_index_html(refresh: bool) -> str:
     })
     last_err = ""
     payload = None
-    for attempt in range(1, 4):
-        req = urllib.request.Request(f"{API}?{query}", headers={"User-Agent": UA})
+    for attempt in range(1, 6):
+        req = urllib.request.Request(f"{API}?{query}", headers=API_HEADERS)
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310
                 payload = json.loads(resp.read().decode("utf-8", errors="replace"))
@@ -100,8 +108,8 @@ def fetch_index_html(refresh: bool) -> str:
         except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, TimeoutError) as e:
             # wiki 对连续请求会返回 HTTP 567 限流，按退避重试
             last_err = str(e)
-            wait = 8 * attempt
-            print(f"[重试 {attempt}/3] {last_err} -> {wait}s 后重试")
+            wait = 4 * attempt
+            print(f"[重试 {attempt}/5] {last_err} -> {wait}s 后重试")
             time.sleep(wait)
     if payload is None:
         raise SystemExit(f"[错误] 索引页抓取失败: {last_err}\n已有缓存仍在 {INDEX_CACHE}，可去掉 --refresh 复用。")
@@ -135,13 +143,20 @@ def parse_bond_kinds(text: str) -> dict[str, str]:
 
 
 def parse_rows(text: str, bond_kinds: dict[str, str]) -> list[dict]:
-    """解析角色行 -> 记录列表。"""
+    """解析角色行 -> 记录列表。
+
+    BWIKI 2026-11 改版后索引页按赛季分表，同一角色可出现在多个赛季
+    （href 形如 ``货币战争/万敌#入画奇航``），且不同赛季的费用/羁绊/站位不同。
+    这里保留 ``#`` 后的赛季名到 ``variant``，否则同名角色会互相覆盖、
+    与 characters.py 注册表比对时也会产生大量「费用不一致」误报。
+    """
     records: list[dict] = []
     for m in re.finditer(r'<tr class="divsort"([^>]*)>(.*?)</tr>', text, re.S):
         attrs, body = m.group(1), m.group(2)
         param = dict(re.findall(r'data-param(\d)="([^"]*)"', attrs))
-        page = _attr(body, "href").split("/sr/")[-1]
-        page = urllib.parse.unquote(page.split("#")[0])
+        raw_href = _attr(body, "href").split("/sr/")[-1]
+        page, _, anchor = urllib.parse.unquote(raw_href).partition("#")
+        variant = anchor.strip()
         wiki_name = page.split("/")[-1] if "/" in page else _attr(body, "title")
         bonds = _split_list(html.unescape(param.get("3", "")))
         position = POSITION_MAP.get(param.get("2", ""), param.get("2", ""))
@@ -154,6 +169,7 @@ def parse_rows(text: str, bond_kinds: dict[str, str]) -> list[dict]:
             "name": registry["name"] if registry else wiki_name,
             "wiki_name": wiki_name,
             "wiki_page": page,
+            "variant": variant,
             "cost": cost,
             "position": position,
             "tags": _split_list(html.unescape(param.get("1", ""))),
@@ -173,7 +189,18 @@ def parse_rows(text: str, bond_kinds: dict[str, str]) -> list[dict]:
                 diff.append(f"站位 注册表{registry['positioning']} != wiki{position}")
             record["registry_diff"] = diff
         records.append(record)
-    return sorted(records, key=lambda c: (c["cost"] or 99, c["name"]))
+    # 改版后同名角色可能横跨多个赛季，注册表只对应当前赛季：
+    # 只要任一赛季变体与注册表一致，就不把其他赛季的差异当成异常。
+    for c in records:
+        if not c.get("registry") or not c.get("registry_diff"):
+            continue
+        if any(s is not c
+               and s["name"] == c["name"]
+               and s.get("registry")
+               and not s.get("registry_diff")
+               for s in records):
+            c["registry_diff"] = []
+    return sorted(records, key=lambda c: (c["cost"] or 99, c["name"], c["variant"]))
 
 
 def match_registry(name: str) -> dict | None:
@@ -211,7 +238,10 @@ def render_md(data: dict) -> str:
         "# 货币战争角色数据（BWIKI 角色一览）",
         "",
         f"- 来源：<{meta['source']}>",
-        f"- 抓取时间：{meta['fetched_at']}｜角色数：{meta['count']}｜羁绊数：{len(bonds)}",
+        f"- 抓取时间：{meta['fetched_at']}｜角色条目：{meta['count']}｜唯一角色：{meta.get('unique_count', meta['count'])}｜羁绊数：{len(bonds)}",
+        (f"- 赛季：{'、'.join(f'{k}（{v} 条）' for k, v in meta['variants'].items())}；"
+         "同一角色在不同赛季的费用/羁绊/站位可能不同，表格按赛季分行列出。"
+         if meta.get("variants") else ""),
         f"- 完整记录：`{JSON_PATH.relative_to(REPO_ROOT).as_posix()}`",
         "- 站位/费用/羁绊/标签直接取自索引页表格；赋能、推荐装备等角色详情未纳入（数据量与请求成本不划算，需要时另行抓子页）",
         "",
@@ -233,12 +263,13 @@ def render_md(data: dict) -> str:
     lines += [
         "## 角色速查（按费用）",
         "",
-        "| 费用 | 名称 | 站位 | 标签 | 羁绊 | 版本 | 顾问 | 注册表 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| 费用 | 名称 | 赛季 | 站位 | 标签 | 羁绊 | 版本 | 顾问 | 注册表 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for c in chars:
         lines.append(
-            f"| {'/'.join(map(str, c.get('costs') or [c['cost']]))} | {c['name']} | {c['position']} | "
+            f"| {'/'.join(map(str, c.get('costs') or [c['cost']]))} | {c['name']} | {c.get('variant', '')} | "
+            f"{c['position']} | "
             f"{'、'.join(c['tags'])} | "
             f"{'、'.join(c['bonds'])} | {c['version']} | {'是' if c['expert'] else ''} | "
             f"{'✓' if c['registry'] else '未收录'} |"
@@ -248,10 +279,10 @@ def render_md(data: dict) -> str:
     missing = [c for c in chars if c["registry"] is None]
     diff = [c for c in chars if c.get("registry_diff")]
     for c in missing:
-        lines.append(f"- 未收录：{c['name']}（wiki 页 {c['wiki_page']}，{c['cost']}费 {c['position']} "
+        lines.append(f"- 未收录：{c['name']}（{c.get('variant', '')}赛季，wiki 页 {c['wiki_page']}，{c['cost']}费 {c['position']} "
                      f"{'、'.join(c['bonds'])}）")
     for c in diff:
-        lines.append(f"- {c['name']}：{'；'.join(c['registry_diff'])}")
+        lines.append(f"- {c['name']}（{c.get('variant', '')}赛季）：{'；'.join(c['registry_diff'])}")
     if not missing and not diff:
         lines.append("- 无差异")
     lines.append("")
@@ -336,6 +367,11 @@ def rebuild(refresh: bool) -> None:
             "index_page": INDEX_PAGE,
             "fetched_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
             "count": len(characters),
+            "unique_count": len({c["name"] for c in characters}),
+            "variants": dict(sorted(
+                ((v, sum(1 for c in characters if c.get("variant") == v))
+                 for v in {c.get("variant", "") for c in characters} if v),
+                key=lambda x: -x[1])),
             "bond_kinds": bond_kinds,
         },
         "bonds": build_bond_index(characters),
