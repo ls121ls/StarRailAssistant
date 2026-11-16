@@ -131,7 +131,9 @@ class CurrencyWars(Executable):
             "头号玩家": ("我来当策划", self.handle_silver_wolf_lv999),
             "开拓银轨": ("开拓商店", self.handle_trailblaze_store),
             "奇兽花园": ("奇兽花园", self.handle_beast_garden),
-            "梦境交织": ("梦境交织", self.handle_dream_interference)
+            "梦境交织": ("梦境交织", self.handle_dream_interference),
+            "巡海游侠": ("巡海游侠", self.handle_sea_trader),
+            "黑市主理人": ("黑市主理人", self.handle_black_market_manager)
         }
         self.is_continue = False  # 是否是继续挑战
         self.is_game_over = False
@@ -213,14 +215,16 @@ class CurrencyWars(Executable):
         if self.runtimes == 0:
             logger.warning("货币战争运行次数为 0 ，本次将跳过运行。")
             return True
-        if self.isPointRewardsEnabled:
-            page = self.page_locate()
-            if page == CurrencyWarsPage.START and self.check_point_rewards():
-                logger.info("旷宇纷争积分奖励已满，跳过货币战争任务")
-                return True
+        
         for i in range(self.runtimes):
             if not self.is_running:
                 break
+            if self.isPointRewardsEnabled:
+                page = self.page_locate()
+                if page == CurrencyWarsPage.START and self.check_point_rewards():
+                    logger.info("旷宇纷争积分奖励已满，跳过货币战争任务")
+                    self.receive_point_rewards()
+                    break
             logger.info(f"第{i + 1}次进入货币战争，剩余{self.runtimes - i - 1}次")
             self._game_started_at = time.monotonic()
             self._long_game_alerted = False
@@ -269,6 +273,11 @@ class CurrencyWars(Executable):
             if re.match(r'^18000.*18000$', current):
                 return True
         return False
+
+    def receive_point_rewards(self):
+        self.operator.click_point(0.15, 0.93, tag="领取积分奖励", after_sleep=1)
+        self.operator.click_img(DUIMG.RECEIVE, after_sleep=1)
+        self.operator.press_key("esc")
 
     def reset_character(self):
         """ 重置所有角色信息 """
@@ -642,7 +651,7 @@ class CurrencyWars(Executable):
         """
         if self.is_continue or not self.strategy_code:
             return True
-        self.operator.click_img(CWIMG.STRATEGY, after_sleep=1)
+        self.operator.click_img(CWIMG.STRATEGY, after_sleep=1, retry=3)
         self.operator.click_img(CWIMG.HOT_STRATEGIES, after_sleep=0.5)
         self.operator.move_to(0.5, 0.5)
         self.operator.sleep(0.5)
@@ -715,11 +724,11 @@ class CurrencyWars(Executable):
                     self.sort_all_areas_by_priority()  # 优先级排序
                     continue
                 break
-            self.handle_special_event()
             if not self.stage_transition():
                 break
             if self.is_game_over:  # 任务已被标记为停止, 需要退出循环
                 break
+            self.handle_special_event()
             self.shopping()
 
             run_times += 1
@@ -1538,7 +1547,7 @@ class CurrencyWars(Executable):
         """处理投资策略选择界面的逻辑"""
         if not self.operator.click_img(CWIMG.COLLECTION):
             self.operator.click_point(0.5, 0.3, after_sleep=0.5, tag="选择中间的投资策略")
-        self.operator.click_img(IMG.ENSURE2, after_sleep=1)
+        self.operator.click_img(IMG.ENSURE2, after_sleep=1, retry=3)
         self.post_invest_strategy()
         return False
 
@@ -1629,6 +1638,15 @@ class CurrencyWars(Executable):
                                             self.strategy_special_events.get("梦境交织", ""),
                                             count=2)
 
+    def handle_sea_trader(self):
+        """处理巡海游侠事件的逻辑"""
+        return self._handle_selection_event((0.22, 0.30, 0.85, 0.36),
+                                            self.strategy_special_events.get("巡海游侠", ""))
+
+    def handle_black_market_manager(self):
+        """处理黑市主理人事件的逻辑"""
+        return self.operator.press_key("esc")
+
     def detect_special_event(self) -> str:
         """检测当前是否有特殊事件发生，并返回事件名称"""
         result = self.operator.ocr(from_x=0.49, from_y=0.038, to_x=0.60, to_y=0.11)
@@ -1698,7 +1716,7 @@ class CurrencyWars(Executable):
             if return_box is None:
                 logger.error("[幕后茶歇] 未识别到返回按钮，茶歇事件推进失败")
                 return False
-            self.operator.click_box(return_box, y_offset=-0.1, after_sleep=0.5)  # 点击返回选项的上一个选项
+            self.operator.click_box(return_box, y_offset=-0.2, after_sleep=0.5)  # 点击返回选项的上一个选项
             ensure_box = self.operator.wait_ocr("确认", from_x=0.58, from_y=0.38, to_x=0.96, to_y=0.8, timeout=3)
             if ensure_box is None:
                 logger.error("[幕后茶歇] 未识别到确认按钮，茶歇事件推进失败")

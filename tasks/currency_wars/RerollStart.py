@@ -223,7 +223,7 @@ class RerollStart(CurrencyWars):
             result = self._detect_invest_env()
             if result != -1:
                 self.operator.click_point(0.25 * (result + 1), 0.27, tag="投资环境", trace=True)  # 根据投资环境的位置计算点击坐标，每个环境占屏幕宽度的25%
-                self.operator.click_img(IMG.ENSURE2, after_sleep=1)
+                self.operator.click_img(IMG.ENSURE2, after_sleep=1, retry=3)
                 logger.info("投资环境符合要求，继续游戏...")
                 if 0 <= result < len(self._detected_env_names):
                     self._record_invest_environment(self._detected_env_names[result])
@@ -301,7 +301,7 @@ class RerollStart(CurrencyWars):
             if box is not None:
                 logger.info("投资策略符合要求，继续游戏...")
                 self.operator.click_box(box)
-                self.operator.click_img(IMG.ENSURE2, after_sleep=1)
+                self.operator.click_img(IMG.ENSURE2, after_sleep=1, retry=3)
                 self._record_invest_strategy(getattr(box, "source", ""))
                 self.post_invest_strategy()
                 return True
@@ -551,7 +551,7 @@ class RerollStart(CurrencyWars):
         self._detected_env_names = detected_invest_env
         
         # 优先检测必须的投资环境
-        assert self.wanted_invest_env, "必须的投资环境不能为空"
+        assert self.wanted_invest_env is not None, "wanted_invest_env must be a list at this time"
         for i, env in enumerate(detected_invest_env):
             # 使用匹配器匹配：通过 want.match 与识别到的env比较
             for want in self.wanted_invest_env:
