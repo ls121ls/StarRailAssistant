@@ -15,5 +15,7 @@
   "攻略.title": "Strategy",
   "运行次数.title": "Rounds",
   "难度.title": "Difficulty",
-  "超频博弈.title": "Overclock"
+  "超频博弈.title": "Overclock",
+  "投资策略优先.title": "Investment strategy priority",
+  "投资策略优先.description": "Optional; separate investment strategy names with semicolons, earlier entries take priority. Leave empty to use the strategy's recommend_invest_strategies."
 }

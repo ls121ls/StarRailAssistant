@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import re
 from typing import Any, Callable, Mapping, Sequence
 
+from tasks.currency_wars.shared_constants import EQUIPMENT_ROUNDS
+
 
 @dataclass(frozen=True)
 class EquipmentConfig:
@@ -14,9 +16,9 @@ class EquipmentConfig:
     interval_battles: int
 
 
-# 当前对局节点数：位面1 共9个（1-9首领），位面2/3 各7个（2-7/3-7首领）。
-# 装备只在每个位面的第4个节点和最后一个节点处理，其余节点不打开装备面板。
-EQUIPMENT_ROUNDS = frozenset({(1, 4), (1, 9), (2, 4), (2, 7), (3, 4), (3, 7)})
+# 装备节点与主任务共用 shared_constants 中的同一份定义：
+# 位面1 共9个（1-9首领），位面2/3 各7个（2-7/3-7首领），
+# 只在每个位面的第4个节点和最后一个节点处理装备。
 
 
 def is_equipment_round(round_label: Any) -> bool:
