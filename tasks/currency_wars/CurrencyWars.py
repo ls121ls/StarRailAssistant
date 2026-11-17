@@ -147,7 +147,9 @@ class CurrencyWars(Executable):
             "奇兽花园": ("奇兽花园", self.handle_beast_garden),
             "梦境交织": ("梦境交织", self.handle_dream_interference),
             "巡海游侠": ("巡海游侠", self.handle_sea_trader),
-            "黑市主理人": ("黑市主理人", self.handle_black_market_manager)
+            "黑市主理人": ("黑市主理人", self.handle_black_market_manager),
+            "双龙吟": ("双龙吟", self.handle_double_dragon),
+            "苍龙濯世": ("苍龙濯世", self.handle_world_cleansing_dragon),
         }
         self.is_continue = False  # 是否是继续挑战
         self.is_game_over = False
@@ -697,19 +699,43 @@ class CurrencyWars(Executable):
         """
         return True
 
-    def abort_and_return(self) -> bool:
-        """中止当前对局并返回开始页面"""
-        logger.info("中止当前对局并返回开始页面")
+    def abort_and_return(self, retries: int = 3) -> bool:
+        """中止当前对局并返回开始页面
+
+        退出流程常因确认弹窗延迟弹出或被其他弹窗遮挡而识别失败，
+        因此整体重试：每次失败先按 ESC 关闭残留弹窗，再重新定位退出按钮。
+        """
+        for attempt in range(1, retries + 1):
+            logger.info("中止当前对局并返回开始页面")
+            if self._abort_current_game():
+                return True
+            if attempt < retries:
+                self.operator.press_key("esc")
+                self.operator.sleep(1)
+        logger.error(f"退出对局失败，已重试{retries}次")
+        return False
+
+    def _abort_current_game(self) -> bool:
+        """执行一次退出对局流程，成功返回 True"""
+        # 已经回到开始页面时无需再退出
+        if self.operator.locate(CWIMG.START_CURRENCY_WARS) is not None:
+            return True
+
         index, box = self.operator.wait_any_img([CWIMG.QUIT, CWIMG.WITHDRAW_AND_SETTLE])
-        if index<0:
+        if index < 0:
             return False
         if index == 0:
+            self.operator.click_box(box, after_sleep=0.5)
+            # 确认按钮可能延迟弹出，先等待再点击
+            confirm_box = self.operator.wait_img(CWIMG.WITHDRAW_AND_SETTLE, timeout=8)
+            if confirm_box is None:
+                return False
+            self.operator.click_box(confirm_box, after_sleep=1)
+        else:
             self.operator.click_box(box, after_sleep=1)
-            self.operator.click_img(CWIMG.WITHDRAW_AND_SETTLE)
-        elif index == 1:
-            self.operator.click_box(box)
-        b = self.operator.wait_img(CWIMG.NEXT_STEP)
-        if b is None:
+
+        # 结算页面出现较慢，延长等待时间
+        if self.operator.wait_img(CWIMG.NEXT_STEP, timeout=20) is None:
             return False
         self.handle_game_over(None)
         return True
@@ -738,6 +764,7 @@ class CurrencyWars(Executable):
                     self.sort_all_areas_by_priority()  # 优先级排序
                     continue
                 break
+            self.handle_special_event()
             if not self.stage_transition():
                 break
             if self.is_game_over:  # 任务已被标记为停止, 需要退出循环
@@ -1312,8 +1339,6 @@ class CurrencyWars(Executable):
                 for y in range(20, 41, 5):
                     self.operator.click_point(x / 100, y / 100, trace=False)
 
-        self.detect_silver_wolf_lv999()  # 也许开出银狼了
-
     def sell_character(self):
         """
         实现角色出售逻辑，确保备战席不超过8个角色
@@ -1645,7 +1670,6 @@ class CurrencyWars(Executable):
         """处理补给阶段的逻辑"""
         self.operator.click_point(0.53, 0.52, after_sleep=1)  # 选择固定位置
         self.operator.click_point(0.88, 0.91, after_sleep=1)  # 点击确认按钮
-        self.detect_silver_wolf_lv999()  # 也许选到银狼了
         return False
 
     def handle_encounter_node(self, _: StageName | None) -> bool:
@@ -1732,6 +1756,16 @@ class CurrencyWars(Executable):
         """处理黑市主理人事件的逻辑"""
         return self.operator.press_key("esc")
 
+    def handle_double_dragon(self):
+        """处理双龙吟事件的逻辑"""
+        return self._handle_selection_event((0.22, 0.30, 0.85, 0.35),
+                                            self.strategy_special_events.get("双龙吟", ""))
+
+    def handle_world_cleansing_dragon(self):
+        """处理苍龙濯世事件的逻辑"""
+        return self._handle_selection_event((0.22, 0.12, 0.85, 0.17),
+                                            self.strategy_special_events.get("苍龙濯世", ""))
+
     def detect_special_event(self) -> str:
         """检测当前是否有特殊事件发生，并返回事件名称"""
         result = self.operator.ocr(from_x=0.49, from_y=0.038, to_x=0.60, to_y=0.11)
@@ -1746,17 +1780,13 @@ class CurrencyWars(Executable):
                 return event
         return ""
 
-    def detect_silver_wolf_lv999(self):
-        """处理银狼LV.999 2星事件的逻辑"""
-        if self.operator.locate(CWIMG.SILVER_WOLF_LV999):
-            self.handle_silver_wolf_lv999()
-
     def handle_silver_wolf_lv999(self):
         return self._handle_selection_event((0.22, 0.34, 0.85, 0.4),
                                             self.strategy_special_events.get("头号玩家", ""))
 
     def handle_special_event(self):
         """处理特殊事件的逻辑"""
+        logger.debug("检测特殊事件")
         event = self.detect_special_event()
 
         if event:
@@ -1791,10 +1821,15 @@ class CurrencyWars(Executable):
 
         def _drive_tea_break(_option: tuple[float, float]) -> bool:
             """推进茶歇事件：处理对话、特殊事件奖励与开箱，直到回到备战界面"""
-            self.operator.click_point(*_option, after_sleep=1)
             self.operator.do_while(
-                lambda : self.operator.locate(CWIMG.TEA_BREAK, from_x=0.65, from_y=0.8, to_x=0.9, to_y=0.9) is not None,
+                lambda : self.operator.click_point(*_option, after_sleep=1),
+                lambda : self.operator.ocr_match("幕后", from_x=0.46, from_y=0.13, to_x=0.53, to_y=0.18) is not None,
+                max_iterations=3
+            )
+            logger.info("[幕后茶歇] 已选择茶歇选项，推进对话")
+            self.operator.do_while(
                 lambda : self.operator.click_point(0.5, 0.5, after_sleep=1),
+                lambda : self.operator.ocr_match("返回", from_x=0.58, from_y=0.38, to_x=0.96, to_y=0.8) is None,
                 max_iterations=5
             )
             return_box = self.operator.wait_ocr("返回", from_x=0.58, from_y=0.38, to_x=0.96, to_y=0.8, timeout=3)
@@ -1810,11 +1845,12 @@ class CurrencyWars(Executable):
             self.operator.do_while(
                 lambda: self.operator.locate(CWIMG.CLICK_BLANK, from_x=0.65, from_y=0.8, to_x=0.9, to_y=0.9) is None,
                 lambda: self.operator.click_point(0.5, 0.9, after_sleep=1),
+                interval=1,
                 max_iterations=5
             )  # 点击空白处推进对话，直到出现「点击空白处继续」提示
             return True
 
-        if self.operator.ocr_match("享用茶歇", from_x=0.70, from_y=0.56, to_x=0.90, to_y=0.62) is None:
+        if self.operator.wait_ocr("幕后", from_x=0.46, from_y=0.13, to_x=0.53, to_y=0.18) is None:
             logger.error("[幕后茶歇] 未识别到茶歇事件界面")
             return False
         # 生命值偏低时优先享用茶歇回复生命，否则与奇遇伙伴对话获取特殊奖励
@@ -1824,6 +1860,7 @@ class CurrencyWars(Executable):
     def handle_protagonist_selection(self) -> bool:
         """处理「选择主角」奇遇节点。"""
         logger.info("选择主角")
+        self.operator.wait_ocr("选择", from_x=0.42, from_y=0.06, to_x=0.58, to_y=0.11)
         self.operator.click_point(0.2, 0.3, after_sleep=1, tag="选择左侧效果")
         target = (0.5, 0.4)
         # 从前台角色中按优先级从高到低依次尝试
@@ -1889,7 +1926,7 @@ class CurrencyWars(Executable):
                     logger.info(f"购买角色：{c.name}")
                     # 特殊处理
                     if c.name == Characters.SilverWolfLV999.name:
-                        self.detect_silver_wolf_lv999()
+                        self.handle_special_event()
                     self.operator.move_to(0.5, 0.5)  # 移动鼠标避免遮挡
 
             logger.info("当前商店无目标角色可购买")

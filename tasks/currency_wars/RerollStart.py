@@ -68,6 +68,12 @@ class RerollStart(CurrencyWars):
     INVEST_ENV_OCR_TO_X = 0.885
     INVEST_ENV_OCR_TO_Y = 0.380
 
+    # 奇遇伙伴名称OCR区域（基于1920x1080截图坐标: 1152,648-1344,713）
+    ENCOUNTER_PARTNER_OCR_FROM_X = 0.6
+    ENCOUNTER_PARTNER_OCR_FROM_Y = 0.6
+    ENCOUNTER_PARTNER_OCR_TO_X = 0.7
+    ENCOUNTER_PARTNER_OCR_TO_Y = 0.66
+
     def __init__(self, operator, runtimes):
         super().__init__(operator, runtimes)
         self.reroll = False  # 重开标志
@@ -75,6 +81,7 @@ class RerollStart(CurrencyWars):
         self.optional_invest_env: list[strutil.StrMatcher] | None = None  # 可选的投资环境
         self.wanted_invest_strategies: list[strutil.StrMatcher] | None = None  # 各阶段需要的投资策略（列表，按阶段顺序）
         self.wanted_boss_names: list[strutil.StrMatcher] | None = None  # 需要的Boss名称
+        self.wanted_encounter_partners: list[strutil.StrMatcher] | None = None  # 需要的奇遇伙伴名称
         self.wanted_boss_affixes: list[strutil.StrMatcher] | None = None  # 必须出现的boss词缀
         self.hate_boss_affixes: list[strutil.StrMatcher] | None = None  # 讨厌的boss词缀，出现就重开
         self.invest_strategy_stage = 0  # 投资策略阶段
@@ -83,6 +90,8 @@ class RerollStart(CurrencyWars):
         self.recommended_strategy_matcher: PriorityMatcher | None = None  # 开局达成后三选一时优先沿用的候选表
         self._detected_env_names: list[str] = []  # 最近一次识别到的投资环境名称（与下标对应）
         self._last_strategy_cards: list[str] = []  # 最近一次识别到的三张投资策略卡名
+        self.invest_env_satisfied = False  # 本轮进入对局时是否已刷到符合要求的投资环境
+        self.encounter_partner_satisfied = False  # 本轮进入对局时是否已刷到符合要求的奇遇伙伴
 
     def handle_ending(self):
         # 未刷到理想开局时保持现状：不结算也不退出，把局面留给人工接手
@@ -200,6 +209,19 @@ class RerollStart(CurrencyWars):
             normalized_boss_names.append(strutil.ContainsMatcher(""))
         self.wanted_boss_names = normalized_boss_names if any(normalized_boss_names) else None
 
+    def set_encounter_partner(self, encounter_partners: str):
+        """设置奇遇伙伴要求
+
+        多个伙伴名以空格分隔，识别到其中任意一个即视为符合要求；留空表示不限制。
+        """
+        self.wanted_encounter_partners = list()
+        if not encounter_partners:
+            return
+        for item in encounter_partners.split():
+            name = strutil.clean_text(item)
+            if name:
+                self.wanted_encounter_partners.append(strutil.RegexMatcher(name))
+
     def set_boss_affix(self, boss_affix: str):
         """设置boss词缀"""
         if not boss_affix:
@@ -214,11 +236,23 @@ class RerollStart(CurrencyWars):
                 self.wanted_boss_affixes.append(strutil.RegexMatcher(strutil.clean_text(item)))
 
     def handle_boss_info(self) -> None:
+        # 每次判定前重置，避免上一次的结果影响本轮
+        self.encounter_partner_satisfied = False
+
         if self.wanted_boss_names:
             logger.info("检测到开局，正在识别Boss名称...")
             if not self._detect_boss_name():
                 logger.info("Boss名称不符合要求，准备重开...")
                 self.reroll = True
+
+        if not self.reroll and self.wanted_encounter_partners:
+            logger.info("检测到开局，正在识别奇遇伙伴...")
+            if not self._detect_encounter_partner():
+                logger.info("奇遇伙伴不符合要求，准备重开...")
+                self.reroll = True
+            else:
+                self.encounter_partner_satisfied = True
+                logger.info("奇遇伙伴符合要求，继续游戏...")
 
         if not self.reroll and (self.wanted_boss_affixes or self.hate_boss_affixes):
             logger.info("检测到开局，正在识别Boss词缀...")
@@ -229,6 +263,8 @@ class RerollStart(CurrencyWars):
                 logger.info("Boss词缀符合要求，继续游戏...")
 
     def handle_invest_environment(self) -> None:
+        # 每次判定前重置，避免上一次的匹配结果影响本轮
+        self.invest_env_satisfied = False
         if not (self.wanted_invest_env or self.optional_invest_env):
             super().handle_invest_environment()
             return
@@ -239,6 +275,7 @@ class RerollStart(CurrencyWars):
             if result != -1:
                 self.operator.click_point(0.25 * (result + 1), 0.27, tag="投资环境", trace=True)  # 根据投资环境的位置计算点击坐标，每个环境占屏幕宽度的25%
                 self.operator.click_img(IMG.ENSURE2, after_sleep=1, retry=3)
+                self.invest_env_satisfied = True
                 logger.info("投资环境符合要求，继续游戏...")
                 if 0 <= result < len(self._detected_env_names):
                     self._record_invest_environment(self._detected_env_names[result])
@@ -255,14 +292,31 @@ class RerollStart(CurrencyWars):
                 super().handle_invest_environment()
 
     def handle_game_entered(self) -> bool:
+        # 本轮是否刷到了符合要求的投资环境与奇遇伙伴；每次进入对局只判定一次
+        invest_env_satisfied = self.invest_env_satisfied
+        self.invest_env_satisfied = False
+        encounter_partner_satisfied = self.encounter_partner_satisfied
+        self.encounter_partner_satisfied = False
+
         if self.reroll:
             self.abort_and_return()
             self.reroll = False
             return False
         if self.opening_satisfied:
             return True
-        # 没有投资策略要求，或所有阶段要求均已满足：本次开局即为理想开局，转为按攻略继续对局
+        # 没有投资策略要求，或所有阶段要求均已满足：仍需确认投资环境与奇遇伙伴达标。
+        # 从「继续进度」/准备阶段直接进入对局不会经过开局判定，此时必须重开。
         if not self.wanted_invest_strategies or self.invest_strategy_stage >= len(self.wanted_invest_strategies):
+            unsatisfied = []
+            if (self.wanted_invest_env or self.optional_invest_env) and not invest_env_satisfied:
+                unsatisfied.append("投资环境")
+            if self.wanted_encounter_partners and not encounter_partner_satisfied:
+                unsatisfied.append("奇遇伙伴")
+            if unsatisfied:
+                logger.info(f"尚未刷到符合要求的{'、'.join(unsatisfied)}，准备重开...")
+                self.abort_and_return()
+                return False
+            # 达标后按本地流程继续打完整局，而不是停在这里
             logger.info("已刷到满足要求的开局，转为按攻略继续对局...")
             self._mark_opening_satisfied()
         return True
@@ -547,6 +601,28 @@ class RerollStart(CurrencyWars):
                 return False
 
         return True
+
+    def _detect_encounter_partner(self) -> bool:
+        """识别本局奇遇伙伴名称，判断是否符合配置要求"""
+        raw_results = self.operator.ocr(
+            from_x=self.ENCOUNTER_PARTNER_OCR_FROM_X,
+            from_y=self.ENCOUNTER_PARTNER_OCR_FROM_Y,
+            to_x=self.ENCOUNTER_PARTNER_OCR_TO_X,
+            to_y=self.ENCOUNTER_PARTNER_OCR_TO_Y,
+        )
+        if not raw_results:
+            logger.warning("奇遇伙伴OCR识别失败：无识别结果")
+            return False
+
+        detected_names = [strutil.clean_text(str(item[1])) for item in raw_results]
+        logger.info(f"识别到奇遇伙伴：{detected_names}")
+
+        for name in detected_names:
+            for want in self.wanted_encounter_partners or []:
+                if want.match(name):
+                    logger.info(f"奇遇伙伴符合要求【{name}】(匹配: {want.value})")
+                    return True
+        return False
 
     def _detect_invest_env(self):
         detected_invest_env = []
