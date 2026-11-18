@@ -13,6 +13,7 @@ using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SRAFrontend.Data;
+using SRAFrontend.Desktop.Models;
 using SRAFrontend.Desktop.Services;
 using SRAFrontend.Desktop.Views;
 using SRAFrontend.Localization;
@@ -45,7 +46,10 @@ public partial class SettingsPageViewModel : PageViewModel
         CommonModel commonModel,
         RegistryService registryService,
         IBackendService backendService,
-        OverlayService overlayService, ReportService reportService) : base(PageName.Setting,
+        OverlayService overlayService,
+        ReportService reportService,
+        CommandPaletteService commandPaletteService,
+        HotkeyCaptureService hotkeyCaptureService) : base(PageName.Setting,
         "\uE272")
     {
         _settingsService = settingsService;
@@ -57,7 +61,7 @@ public partial class SettingsPageViewModel : PageViewModel
         _overlayService = overlayService;
         _reportService = reportService;
         // 任务通用设置中的 启动/停止 快捷键（非游戏内快捷键分组）
-        StartStopKey = new CustomizableKey
+        StartStopKey = new CustomizableKey(hotkeyCaptureService)
         {
             IconText = "\uE3E4",
             DisplayText = Resources.StopHotkeyText,
@@ -67,35 +71,35 @@ public partial class SettingsPageViewModel : PageViewModel
 
         _customizableKeys =
         [
-            new CustomizableKey
+            new CustomizableKey(hotkeyCaptureService)
             {
                 IconText = "\uE1F6",
                 DisplayText = Resources.ActivityText,
                 DefaultKey = "F1"
             }.Configure(() => Settings.General.HotkeyF1,
                 value => Settings.General.HotkeyF1 = value),
-            new CustomizableKey
+            new CustomizableKey(hotkeyCaptureService)
             {
                 IconText = "\uE320",
                 DisplayText = Resources.ChronicleText,
                 DefaultKey = "F2"
             }.Configure(() => Settings.General.HotkeyF2,
                 value => Settings.General.HotkeyF2 = value),
-            new CustomizableKey
+            new CustomizableKey(hotkeyCaptureService)
             {
                 IconText = "\uE77E",
                 DisplayText = Resources.WarpText,
                 DefaultKey = "F3"
             }.Configure(() => Settings.General.HotkeyF3,
                 value => Settings.General.HotkeyF3 = value),
-            new CustomizableKey
+            new CustomizableKey(hotkeyCaptureService)
             {
                 IconText = "\uE0E4",
                 DisplayText = Resources.GuideText,
                 DefaultKey = "F4"
             }.Configure(() => Settings.General.HotkeyF4,
                 value => Settings.General.HotkeyF4 = value),
-            new CustomizableKey
+            new CustomizableKey(hotkeyCaptureService)
             {
                 IconText = "\uE5E4",
                 DisplayText = Resources.TechniqueText,
@@ -111,6 +115,15 @@ public partial class SettingsPageViewModel : PageViewModel
         _overlayService.SetOverlayDebugInfoEnabled(Settings.Advanced.IsDebugOverlayEnabled);
 
         _settingsService.SettingsPropertyChanged += OnSettingsPropertyChanged;
+        commandPaletteService.Register(
+            new PaletteCommand("settings.checkForUpdates", Resources.CheckForUpdateText, PaletteCategory.Sra),
+            CheckForUpdates);
+        commandPaletteService.Register(
+            new PaletteCommand("advanced.startServer", "启动 SRAServer", PaletteCategory.Sra),
+            () => backendService.SendInput("serve"));
+        commandPaletteService.Register(
+            new PaletteCommand("advanced.stopServer", "停止 SRAServer", PaletteCategory.Sra),
+            () => backendService.SendInput("serve stop"));
     }
 
     public IAvaloniaReadOnlyList<CustomizableKey> CustomizableKeys => _customizableKeys;
@@ -259,23 +272,6 @@ public partial class SettingsPageViewModel : PageViewModel
             // 长度正确时，触发异步验证（不阻塞setter）
             _ = VerifyCdkAsync(); // 使用_忽略未等待的Task（需确保异常处理）
         }
-    }
-
-    public TopLevel? TopLevelObject
-    {
-        get;
-        set
-        {
-            field = value;
-            if (value is not null) InitializeKeyBindings(value);
-        }
-    }
-
-    private void InitializeKeyBindings(TopLevel topLevel)
-    {
-        StartStopKey.AttachTopLevel(topLevel);
-        foreach (var key in _customizableKeys)
-            key.AttachTopLevel(topLevel);
     }
 
     public bool IsOverlayEnabled
@@ -494,8 +490,8 @@ public partial class SettingsPageViewModel : PageViewModel
     [RelayCommand]
     private async Task ChangeDownloadPath()
     {
-        if (TopLevelObject is null) return;
-        var folders = await TopLevelObject.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        if (App.TopLevelObject is null) return;
+        var folders = await App.TopLevelObject.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = Resources.DownloadFolderPickerTitle,
             AllowMultiple = false
@@ -562,8 +558,8 @@ public partial class SettingsPageViewModel : PageViewModel
     [RelayCommand]
     private async Task SelectedPath()
     {
-        if (TopLevelObject is null) return;
-        var files = await TopLevelObject.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions());
+        if (App.TopLevelObject is null) return;
+        var files = await App.TopLevelObject.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions());
         if (files.Count == 0) return;
         var localPath = files[0].Path.LocalPath;
         Settings.General.GamePaths.Add(localPath);

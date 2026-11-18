@@ -7,13 +7,14 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Avalonia.Collections;
-using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Platform.Storage;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using SRAFrontend.Data;
+using SRAFrontend.Desktop.Models;
+using SRAFrontend.Desktop.Services;
 using SRAFrontend.Desktop.Utilities;
 using SRAFrontend.Models;
 using SRAFrontend.Services;
@@ -42,7 +43,7 @@ public partial class ConsolePageViewModel : PageViewModel
     [ObservableProperty] private bool _isExporting; // 日志导出进行中标志
 
     public ConsolePageViewModel(IBackendService backendService, SettingsService settingsService, AppService appService,
-        CommonModel commonModel, ILogger<ConsolePageViewModel> logger) : base(
+        CommonModel commonModel, ILogger<ConsolePageViewModel> logger, CommandPaletteService commandPalette) : base(
         PageName.Console, "\uEAE8")
     {
         _backendService = backendService;
@@ -53,9 +54,59 @@ public partial class ConsolePageViewModel : PageViewModel
         _backendService.Outputted += AddConsoleLine;
         _backendService.StartBackend(Arguments);
         FilterOptions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(ConsoleLines));
+        // 命令面板：导出日志
+        commandPalette.Register(
+            new PaletteCommand("console.exportLogs", Resources.ExportLogsText, PaletteCategory.Tools),
+            () => ExportLogsCommand.Execute(null));
+        commandPalette.Register(
+            new PaletteCommand("developer.screenshot", Resources.DeveloperScreenshotText, PaletteCategory.Developer),
+            () => _ = CaptureScreenshotAsync());
+        commandPalette.Register(
+            new PaletteCommand("developer.reloadTask", "开发人员：重载任务", PaletteCategory.Developer),
+            () => _ = ReloadTasksAsync());
     }
 
-    public TopLevel? TopLevelObject { get; set; }
+    /// <summary>命令面板入口：保存一张游戏截图，失败时提示（命令面板不展示返回值）。</summary>
+    private async Task CaptureScreenshotAsync()
+    {
+        try
+        {
+            var result = await _backendService.OperatorCallAsync("screenshot",
+                new { save_path = $"{DataPath.TempDir}/screenshot.png" });
+            if (result is { Success: false })
+            {
+                _logger.LogError("Screenshot capture failed: {Message}", result.Message);
+                _commonModel.ShowErrorToast(Resources.ScreenshotFailedError,
+                    string.Format(Resources.Culture, Resources.UnexpectedErrorMessage, result.Message));
+            }
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Screenshot capture failed");
+            _commonModel.ShowErrorToast(Resources.ScreenshotFailedError,
+                string.Format(Resources.Culture, Resources.UnexpectedErrorMessage, e.Message));
+        }
+    }
+
+    private async Task ReloadTasksAsync()
+    {
+        try
+        {
+            var result = await _backendService.SendInputAndWaitObjectAsync("task reload --json");
+            if (result is { Success: false })
+            {
+                _logger.LogError("Task reload failed: {Message}", result.Message);
+                _commonModel.ShowErrorToast("任务重载失败", result.Message);
+                return;
+            }
+            _commonModel.ShowSuccessToast("任务重载成功", "已重新加载任务配置");
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Task reload failed");
+            _commonModel.ShowErrorToast("任务重载失败", e.Message);
+        }
+    }
 
     private string Arguments => Environment.GetCommandLineArgs().Length > 1
         ? string.Join(' ', Environment.GetCommandLineArgs()[1..].Select(arg => arg.Contains(' ') ? $"\"{arg}\"" : arg))
@@ -139,10 +190,10 @@ public partial class ConsolePageViewModel : PageViewModel
     [RelayCommand]
     private async Task ExportLogsAsync()
     {
-        if (TopLevelObject is null || IsExporting) return;
+        if (App.TopLevelObject is null || IsExporting) return;
 
         // 1. 弹出保存路径选择器（含确认/取消），默认文件名 logs_YYYYMMDD_HHMMSS.zip
-        var saveFile = await TopLevelObject.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        var saveFile = await App.TopLevelObject.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = Resources.ExportLogsText,
             SuggestedFileName = $"logs_{DateTime.Now:yyyyMMdd_HHmmss}",
@@ -205,7 +256,7 @@ public partial class ConsolePageViewModel : PageViewModel
                 counts = new
                     { consoleLines = lines.Length, frontendFiles = frontendCount, backendFiles = backendCount },
                 systemInfo = _appService.GetSystemInfo(),
-                displays = TopLevelObject?.Screens?.All.Select(screen => new
+                displays = App.TopLevelObject?.Screens?.All.Select(screen => new
                 {
                     bounds = new { screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height },
                     workingArea = new
