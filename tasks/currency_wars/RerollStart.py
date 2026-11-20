@@ -456,7 +456,11 @@ class RerollStart(CurrencyWars):
 
     def handle_stage_transitioned(self) -> bool:
         if self.reroll:
-            self.abort_and_return()
+            if not self.abort_and_return():
+                # 退出对局失败，停止任务避免后续流程在错误页面误操作
+                logger.error("刷开局重开失败，停止刷开局任务")
+                self.is_game_over = True
+                self.is_running = False
             self.reroll = False
             return False
         return self.is_running
