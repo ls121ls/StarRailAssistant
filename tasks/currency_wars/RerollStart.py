@@ -410,10 +410,12 @@ class RerollStart(CurrencyWars):
 
         # 检测是否为同一阶段的re-trigger（游戏连续两次弹出投资策略选择界面）
         # prev_stage == StageName.SELECT_INVEST_STRATEGY 表示上一个阶段也是投资策略选择，即re-trigger
+        is_retrigger = False
         if prev_stage == StageName.SELECT_INVEST_STRATEGY and self.wanted_invest_strategies:
             retrigger_index = self.invest_strategy_stage - 1
             if 0 <= retrigger_index < len(self.wanted_invest_strategies):
                 current_stage_index = retrigger_index
+                is_retrigger = True
                 logger.info(f"检测到投资策略re-trigger，阶段{current_stage_index + 1}未变更，不推进阶段")
             else:
                 # re-trigger 但索引越界，说明已无更多阶段要求
@@ -444,7 +446,12 @@ class RerollStart(CurrencyWars):
             if current_stage_index + 1 >= len(self.wanted_invest_strategies):
                 logger.info("当前阶段满足且无后续要求，转为按攻略继续对局...")
                 self._mark_opening_satisfied()
-            return True
+                return True
+            # 选择后可能立刻弹出追加的投资策略三选一（如「黄金投资」的黄金品质选择），
+            # 不能在这里结束关卡循环，否则后续流程会把策略界面当成备战界面
+            # （吸收上游 13008dc 的修复；选中逻辑仍走本地的多选+刷新实现）
+            logger.info("已确认投资策略，继续等待后续关卡状态")
+            return False
 
         # 三张卡都刷过、且最后一次识别仍未命中：不再重开，按基础逻辑（收藏卡/中间卡）选一张继续对局
         self._continue_with_default_strategy(
