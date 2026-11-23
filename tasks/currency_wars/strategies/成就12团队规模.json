@@ -5,9 +5,14 @@
   "uploader": "BWIKI角色数据组合",
   "share_code": "",
   "min_coins": 40,
-  "min_level": 9,
+  "min_level": 7,
   "mid_level": 10,
-  "recommend_environments": ["三星佩佩", "粗星佩佩", "联席决策", "彩虹时代"],
+  "recommend_environments": [
+    "三星佩佩",
+    "粗星佩佩",
+    "联席决策",
+    "彩虹时代"
+  ],
   "recommend_invest_strategies": "这么大的钻石;佩佩驾到;孪生姵姵;艾丝妲的猛犬！;招财狗;溜佩佩;溜佩佩+;星徽大使叽米;金币大使叽米;环保大使叽米",
   "special_events": {
     "领航员": "三月七"

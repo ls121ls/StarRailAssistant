@@ -191,6 +191,41 @@ def test_off_field_area_keeps_single_rectangle():
 
 
 # --------------------------------------------------------------------------
+# 装备轮：缺少「装备推荐」模板时必须整轮跳过，不能动阵容缓存
+# --------------------------------------------------------------------------
+
+class _EquipOperator:
+    def __init__(self):
+        self.clicked: list[tuple] = []
+
+    def click_point(self, *args, **kwargs):
+        self.clicked.append(args)
+
+
+class _EquipStub:
+    equip_cached_characters = main_module.CurrencyWars.equip_cached_characters
+
+    def __init__(self, character):
+        self.operator = _EquipOperator()
+        self.on_field_character = [character]
+        self.off_field_character = [None]
+        self.on_field_area = [(0.1, 0.1)]
+        self.off_field_area = [(0.5, 0.5)]
+
+
+def test_equip_round_is_skipped_without_recommend_template(monkeypatch, tmp_path):
+    """模板缺失时 locate 恒返回 None，若继续执行会把角色缓存清空，
+    随后 place_character 误判空位并把场上攻略角色换掉（20261121 复盘）。"""
+    monkeypatch.setattr(main_module.CWIMG, "EQUIPMENT_RECOMMEND", str(tmp_path / "missing.png"))
+    character = main_module.Characters.get_character("银狼LV.999")
+    stub = _EquipStub(character)
+
+    assert stub.equip_cached_characters(sync_layout=False) == 0
+    assert stub.on_field_character == [character]
+    assert stub.operator.clicked == []
+
+
+# --------------------------------------------------------------------------
 # cw_plus：三选一屏蔽与三列全屏蔽的兜底
 # --------------------------------------------------------------------------
 

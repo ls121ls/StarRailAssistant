@@ -4,6 +4,7 @@ import re
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -125,6 +126,44 @@ def _merge_ocr_lines(fragments: list[tuple[list[tuple[int, int]], str, float]]) 
 def _merge_ocr_text(fragments: list[tuple[list[tuple[int, int]], str, float]]) -> str:
     """按文本框坐标拼接 OCR 片段（多行直接相连），去掉重叠处被重复识别的字。"""
     return ''.join(_merge_ocr_lines(fragments))
+
+
+def _store_slot_index(box, scan_region: tuple[float, float, float, float],
+                      store_area: list[tuple[float, float]], window_width: int) -> int:
+    """按名称文本框的横向位置换算商店槽位下标。
+
+    不能直接用「第几个识别结果」当下标：价格框、未知角色、被切分的文本框都会占位，
+    按下标点击会买到相邻槽位的角色。
+    """
+    points = box or []
+    if not points:
+        return -1
+    center = (min(p[0] for p in points) + max(p[0] for p in points)) / 2
+    from_x, _, to_x, _ = scan_region
+    # OCR 框坐标相对裁剪区域左上角，裁剪宽度按窗口宽度换算
+    crop_width = max(int((window_width or 1920) * (to_x - from_x)), 1)
+    absolute_x = from_x + center / crop_width * (to_x - from_x)
+    return min(range(len(store_area)),
+               key=lambda index: abs(store_area[index][0] - absolute_x))
+
+
+def _split_population_digits(text: str) -> tuple[int | None, int | None]:
+    """从丢失斜杠的人口读数里还原 (当前, 上限)。
+
+    小字号下「7/7」常被读成「i717」这类连写，按位数兜底拆分；仍无法确定时返回 (None, None)。
+    """
+    digits = re.sub(r'\D', '', text)
+    if not digits:
+        return None, None
+    # 切分点偏向左侧多一位：「107」优先读成 10/7 而不是 1/07
+    order = sorted(range(1, len(digits)), key=lambda i: abs(i - (len(digits) + 1) // 2))
+    candidates = [(int(digits[:i]), int(digits[i:])) for i in order]
+    if len(digits) == 3 and digits[0] == digits[2]:  # 7/7 → 717
+        candidates.append((int(digits[0]), int(digits[2])))
+    for current, capacity in candidates:
+        if 1 <= capacity <= 12 and 0 <= current <= 2 * capacity:
+            return current, capacity
+    return None, None
 
 
 class CurrencyWars(Executable):
@@ -1091,6 +1130,14 @@ class CurrencyWars(Executable):
         只点击缓存中已确认身份、属于攻略且仍可装备的角色位置，按攻略优先级
         排序后逐个处理；不依次点击所有槽位，也不点击空位。
         """
+        # 缺少「装备推荐」模板时整轮跳过：locate 对缺失模板与未命中同样返回 None，
+        # 继续执行会把每个角色都判成「缓存已过期」并从阵容缓存里抹掉，
+        # 随后 place_character 误以为前台有空位，用备战席角色把攻略角色顶下场。
+        if not Path(CWIMG.EQUIPMENT_RECOMMEND).exists():
+            if not getattr(self, "_equipment_template_missing_warned", False):
+                logger.warning(f"缺少装备推荐模板 {CWIMG.EQUIPMENT_RECOMMEND}，跳过装备轮")
+                self._equipment_template_missing_warned = True
+            return 0
         if sync_layout:
             self._sync_off_field_area()
         targets: list[tuple[str, int, Character, tuple[float, float]]] = []
@@ -1135,9 +1182,10 @@ class CurrencyWars(Executable):
                 self.operator.sleep(0.4)
                 recommend = self.operator.locate(CWIMG.EQUIPMENT_RECOMMEND)
             if not recommend:
-                # 槽位已不是缓存中的角色或已为空，交给下次完整扫描校正
-                logger.info(f"{area_name}[{index}] 未打开 {character.name} 的角色面板，缓存已过期，跳过装备")
-                self._set_cached_character(area_name, index, None)
+                # 槽位已不是缓存中的角色或面板尚未弹出：只跳过本次装备，保留阵容缓存，
+                # 等下一轮 refresh_character 全量重扫校正。清空缓存会让 place_character
+                # 误判空位，把场上角色换掉。
+                logger.info(f"{area_name}[{index}] 未打开 {character.name} 的角色面板，跳过装备")
                 return False
             panel_character = self._read_panel_character()
             if panel_character is not None and panel_character.name != character.name:
@@ -1177,17 +1225,18 @@ class CurrencyWars(Executable):
         if 0 <= index < len(target):
             target[index] = character
 
-    def get_coins(self):
-        # 实现获取金币逻辑
-        logger.info("获取当前金币数量")
-        coins = self.operator.ocr(from_x=0.84, from_y=0.81, to_x=0.89, to_y=0.89)
-        if coins:
-            try:
-                return int(coins[0][1])
-            except (IndexError, ValueError):
-                return 0
-        else:
-            return 0
+    def get_coins(self) -> int | None:
+        """读取当前金币数量；识别失败返回 None，避免把「读不到」当成 0 金币。"""
+        for _ in range(2):
+            logger.info("获取当前金币数量")
+            result = self.operator.ocr(from_x=0.84, from_y=0.81, to_x=0.89, to_y=0.89)
+            if not result:
+                continue
+            digits = re.search(r"\d+", str(result[0][1]))
+            if digits:
+                return int(digits.group())
+        logger.warning("未能识别金币数量")
+        return None
 
     def _get_character_in_area(self,
                                areas,
@@ -1428,10 +1477,14 @@ class CurrencyWars(Executable):
             return None
         text = _merge_ocr_text(result)
         match = re.search(r"(\d{1,2})\s*[/／]\s*(\d{1,2})", text)
-        if match is None:
-            logger.debug(f"人口计数无法解析：{text}")
-            return None
-        current, capacity = int(match.group(1)), int(match.group(2))
+        if match is not None:
+            current, capacity = int(match.group(1)), int(match.group(2))
+        else:
+            # 斜杠丢失时按位数兜底，避免整段保护逻辑被静默跳过
+            current, capacity = _split_population_digits(text)
+            if current is None or capacity is None:
+                logger.debug(f"人口计数无法解析：{text}")
+                return None
         # 上限最大为等级上限，当前人数最多是每个位置都占 2 个人口
         if not 1 <= capacity <= 12 or not 0 <= current <= 2 * capacity:
             logger.debug(f"人口计数超出合理范围：{text}")
@@ -2018,10 +2071,17 @@ class CurrencyWars(Executable):
                                             self.strategy_special_events.get("机心巧匠", ""))
 
     def shopping(self):
-        def scan_characters_in_store() -> list[Character] | None:
-            """扫描商店中的角色"""
-            results = self.operator.ocr(from_x=0.19, from_y=0.26, to_x=0.88, to_y=0.31)
-            chars = []
+        # 商店名称与价格的识别区域，槽位换算也依赖这两个边界
+        scan_region = (0.19, 0.26, 0.88, 0.31)
+
+        def store_slot_index(box) -> int:
+            window_width = getattr(self.operator.window_context, "width", 0)
+            return _store_slot_index(box, scan_region, self.store_area, window_width)
+
+        def scan_characters_in_store() -> list[tuple[int, Character]] | None:
+            """扫描商店中的角色，返回 (槽位下标, 角色) 列表"""
+            results = self.operator.ocr(*scan_region)
+            slots: dict[int, Character] = {}
             if not results:
                 return []
             for item in results:
@@ -2036,44 +2096,59 @@ class CurrencyWars(Executable):
                 if '备' in name:  # 备战席已满
                     return None
                 char = Characters.get_character(name)
-                if char is not None:
-                    chars.append(char)
-                    logger.info(f"商店中发现角色：{char.name}，P: {char.priority}")
-                else:
+                if char is None:
                     logger.info(f"商店中发现未知角色：{name}")
-            return chars
+                    continue
+                index = store_slot_index(item[0])
+                if index < 0 or index in slots:  # 同一槽位被切成多个文本框时只取第一个
+                    continue
+                slots[index] = char
+                logger.info(f"商店中发现角色：{char.name}，P: {char.priority}")
+            return sorted(slots.items())
 
-        def purchase_target_character(characters: list[Character]) -> bool:
+        def purchase_target_character(characters: list[tuple[int, Character]],
+                                      budget: int | None = None) -> int:
             """
             尝试购买目标角色（策略内的角色）
-            :param characters: 商店中扫描到的角色列表
-            :return: True-购买成功，False-无目标角色可买
+            :param characters: 商店中扫描到的 (槽位下标, 角色) 列表
+            :param budget: 可用金币；给出时买不起的角色直接跳过，避免点击被游戏拒绝
+            :return: 本次购买花费的金币，0 表示没有可买的角色
             """
-            for i, c in enumerate(characters):
-                if c.name in self.strategy_characters.keys():  # 角色在攻略列表中
-                    if c.stars >= self.strategy_characters[c.name]:
-                        continue  # 已达目标星级
-                    # 执行购买操作
-                    target = self.store_area[i]
-                    self.operator.click_point(*target, after_sleep=0.5)
-                    logger.info(f"购买角色：{c.name}")
-                    # 特殊处理
-                    if c.name == Characters.SilverWolfLV999.name:
-                        self.handle_special_event()
-                    self.operator.move_to(0.5, 0.5)  # 移动鼠标避免遮挡
+            spent = 0
+            for index, c in characters:
+                if c.name not in self.strategy_characters.keys():  # 不在攻略列表
+                    continue
+                if c.stars >= self.strategy_characters[c.name]:
+                    continue  # 已达目标星级
+                if budget is not None and spent + c.cost > budget:
+                    continue  # 金币不足
+                # 执行购买操作
+                self.operator.click_point(*self.store_area[index], after_sleep=0.5)
+                logger.info(f"购买角色：{c.name}")
+                spent += c.cost
+                # 特殊处理
+                if c.name == Characters.SilverWolfLV999.name:
+                    self.handle_special_event()
+                self.operator.move_to(0.5, 0.5)  # 移动鼠标避免遮挡
 
-            logger.info("当前商店无目标角色可购买")
-            return False
+            if spent == 0:
+                logger.info("当前商店无目标角色可购买")
+            return spent
 
         cs = scan_characters_in_store()
         if cs:
             purchase_target_character(cs)
         prev_coins = -1
+        coins: int | None = None  # 非 None 时复用上一轮的读数，避免按 F 后再识别一次
         while True:
             purchased = False
 
             level = self.get_level()
-            coins = self.get_coins()
+            if coins is None:
+                coins = self.get_coins()
+                if coins is None:
+                    logger.warning("未识别到金币数量，结束本次购物")
+                    break
 
             # 前后两次循环识别到的金币数量相同则结束循环
             if coins == prev_coins:
@@ -2090,12 +2165,19 @@ class CurrencyWars(Executable):
                 logger.info(f"等级{level}大于3且小于最低等级{self.min_level}，执行升级操作")
                 self.operator.press_key('f')
                 self.operator.sleep(0.5)
+                coins -= 4  # 买经验固定消耗 4 金币，下一轮无需重新识别
                 continue
 
             # 扫描商店角色并尝试购买
             cs = scan_characters_in_store()
+            if cs is None:
+                # 备战席已满，游戏会拒绝购买，继续刷新只是白花金币
+                logger.warning("备战席已满，结束本次购物")
+                break
             if cs:
-                purchased = purchase_target_character(cs)
+                spent = purchase_target_character(cs, coins)
+                purchased = spent > 0
+                coins -= spent  # 用角色费用扣减，避免为一次购买重新识别金币
 
             # 非超频模式：检查金币是否满足保留要求（预判刷新后结果）
             if not self.is_overclock:
@@ -2107,6 +2189,7 @@ class CurrencyWars(Executable):
             # 执行刷新（仅当预判后金币足够时才会走到这里）
             self.operator.press_key('d')
             self.operator.sleep(0.5)
+            coins = None  # 购买与刷新都会改变金币，下一轮重新识别
 
             # 6. 等级<中级等级且未购买：升级（原有逻辑）
             if level < self.mid_level and not purchased:
@@ -2142,9 +2225,10 @@ class CurrencyWars(Executable):
         try:
             if level:
                 return int(level[0][1].split('.')[1])
-            else:
-                return self.max_team_size
+            logger.warning(f"未能识别当前等级，按队伍上限 {self.max_team_size} 处理")
+            return self.max_team_size
         except (ValueError, IndexError):
+            logger.warning(f"未能解析当前等级：{level[0][1]}，按队伍上限 {self.max_team_size} 处理")
             return self.max_team_size
 
     def update_max_team_size(self):
